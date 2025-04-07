@@ -5,9 +5,10 @@ from ultralytics import YOLO
 from tensorflow.keras.models import load_model
 from datetime import datetime
 from sklearn.metrics.pairwise import cosine_similarity
+from collections import defaultdict
 
 # === Load models ===
-model = YOLO("Test/Yolo/yolov10m-face.pt")  # Use yolov8l-face.pt
+model = YOLO("Test/Yolo/yolov10m-face.pt")  # Use yolov10m-face.pt
 emotion_model = load_model("/Users/sam/Documents/GitHub/fyp/Test/FER/model.h5")
 emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
 
@@ -24,9 +25,18 @@ LINE_THICKNESS = 1
 MAX_DET = 100  # Reduce maximum detections (from 1000 to 100)
 
 # === Buffer mechanism parameters ===
-DETECTION_INTERVAL = 5  # Perform detection every 5 frames
+DETECTION_INTERVAL = 1  # Perform detection every frame for better responsiveness
 frame_counter = 0
 last_detections = []  # Store the last detection results
+
+# === Range-based detection parameters ===
+RANGE_THRESHOLD = 50  # Maximum movement (in pixels) allowed from the initial position
+face_initial_positions = {}  # {temp_id: (x1, y1, x2, y2)} to store initial position
+face_ready_to_capture = {}  # {temp_id: bool} to track if face is ready to capture
+captured_faces = {}  # {temp_id: (label, emotion)} to store captured face info
+last_face_data = {}  # {temp_id: (face_img, gray_face, x1, y1, x2, y2)} to store face data for capture
+face_tracking = {}  # {temp_id: (center_x, center_y)} to track faces across frames
+next_temp_id = 0  # Incremental ID for tracking faces
 
 # === Emotion preprocessing ===
 def preprocess_emotion(face_img, size=(48, 48)):
@@ -112,6 +122,92 @@ def save_face_with_folder(face_img, label):
     print(f"Saved {filename} → {folder_path}/")
     return filepath
 
+# === Match current faces to previous faces for tracking ===
+def match_faces(current_boxes):
+    global next_temp_id
+    new_face_tracking = {}
+    new_initial_positions = {}
+    new_ready_to_capture = {}
+    new_face_data = {}
+    new_captured_faces = {}
+
+    # Calculate centers of current boxes
+    current_centers = []
+    for box in current_boxes:
+        x1, y1, x2, y2 = map(int, box[:4])
+        center_x = (x1 + x2) / 2
+        center_y = (y1 + y2) / 2
+        current_centers.append((center_x, center_y, x1, y1, x2, y2))
+
+    # Match current faces to previous faces based on proximity
+    for center_x, center_y, x1, y1, x2, y2 in current_centers:
+        matched_id = None
+        min_distance = float('inf')
+
+        # Find the closest previous face
+        for temp_id, (prev_center_x, prev_center_y) in face_tracking.items():
+            distance = np.sqrt((center_x - prev_center_x)**2 + (center_y - prev_center_y)**2)
+            if distance < min_distance and distance < 100:  # Threshold for matching
+                min_distance = distance
+                matched_id = temp_id
+
+        # If no match found, assign a new ID
+        if matched_id is None:
+            matched_id = f"face_{next_temp_id}"
+            next_temp_id += 1
+
+        # Update tracking and data
+        new_face_tracking[matched_id] = (center_x, center_y)
+        if matched_id in face_initial_positions:
+            new_initial_positions[matched_id] = face_initial_positions[matched_id]
+            new_ready_to_capture[matched_id] = face_ready_to_capture.get(matched_id, False)
+        new_face_data[matched_id] = last_face_data.get(matched_id, (None, None, x1, y1, x2, y2))
+        if matched_id in captured_faces:
+            new_captured_faces[matched_id] = captured_faces[matched_id]
+
+    # Update global tracking dictionaries
+    face_tracking.clear()
+    face_tracking.update(new_face_tracking)
+    face_initial_positions.clear()
+    face_initial_positions.update(new_initial_positions)
+    face_ready_to_capture.clear()
+    face_ready_to_capture.update(new_ready_to_capture)
+    last_face_data.clear()
+    last_face_data.update(new_face_data)
+    captured_faces.clear()
+    captured_faces.update(new_captured_faces)
+
+    return list(new_face_tracking.keys())
+
+# === Check if a face is within the capture range ===
+def is_within_range(temp_id, new_position):
+    """
+    Check if the face stays within a certain range from its initial position.
+    Returns True if within range, False otherwise.
+    """
+    # If this is the first detection, set the initial position
+    if temp_id not in face_initial_positions:
+        face_initial_positions[temp_id] = new_position
+        return False  # Need at least two detections to compare
+
+    # Get the initial position
+    init_pos = face_initial_positions[temp_id]
+    init_center = ((init_pos[0] + init_pos[2]) / 2, (init_pos[1] + init_pos[3]) / 2)
+
+    # Calculate the center of the current position
+    curr_center = ((new_position[0] + new_position[2]) / 2, (new_position[1] + new_position[3]) / 2)
+
+    # Calculate movement from the initial position
+    movement = np.sqrt((curr_center[0] - init_center[0])**2 + (curr_center[1] - init_center[1])**2)
+
+    # If the movement is within the threshold, return True
+    if movement < RANGE_THRESHOLD:
+        return True
+    else:
+        # If the face moves out of range, reset the initial position
+        face_initial_positions[temp_id] = new_position
+        return False
+
 # === Start webcam ===
 cap = cv2.VideoCapture(0)
 
@@ -132,52 +228,96 @@ while cap.isOpened():
             max_det=MAX_DET
         )
 
-        for result in results:
-            boxes = result.boxes.xyxy.cpu().numpy() if result.boxes.xyxy is not None else []
-            
-            if len(boxes) > 0:
-                for i, box in enumerate(boxes):
-                    x1, y1, x2, y2 = map(int, box[:4])
-                    face_img = frame[y1:y2, x1:x2]
-                    gray_face = cv2.cvtColor(face_img, cv2.COLOR_BGR2GRAY)
+        boxes = results[0].boxes.xyxy.cpu().numpy() if results[0].boxes.xyxy is not None else []
+        print(f"Detected {len(boxes)} faces")  # Debug: Check if faces are detected
 
-                    wearing_mask = is_wearing_mask(face_img)
-                    new_embedding = extract_embedding(gray_face, wearing_mask)
+        # Match current faces to previous faces
+        temp_ids = match_faces(boxes)
 
-                    matched_label = "Unknown"
-                    for name, stored_embeddings in reference_faces.items():
-                        if compare_faces_cosine(new_embedding, stored_embeddings):
-                            matched_label = name
-                            break
+        for i, box in enumerate(boxes):
+            x1, y1, x2, y2 = map(int, box[:4])
+            face_img = frame[y1:y2, x1:x2]
+            gray_face = cv2.cvtColor(face_img, cv2.COLOR_BGR2GRAY)
 
-                    if matched_label == "Unknown":
-                        label = f"user{i}.0_{datetime.now().strftime('%H%M%S')}"
-                        update_reference_faces(label, new_embedding)
-                        matched_label = label
-                        save_face_with_folder(face_img, label)
-                    else:
-                        update_reference_faces(matched_label, new_embedding)
+            # Get the corresponding temp_id
+            temp_id = temp_ids[i] if i < len(temp_ids) else f"face_{next_temp_id}"
 
-                    try:
-                        input_face = preprocess_emotion(gray_face)
-                        preds = emotion_model.predict(input_face, verbose=0)
-                        emotion = emotion_labels[np.argmax(preds)]
-                    except:
-                        emotion = "N/A"
+            # Update face data
+            last_face_data[temp_id] = (face_img, gray_face, x1, y1, x2, y2)
 
-                    current_detections.append((x1, y1, x2, y2, matched_label, emotion))
+            # Check if the face has already been captured
+            if temp_id in captured_faces:
+                matched_label, emotion = captured_faces[temp_id]
+                print(f"Displaying captured face {temp_id}: {matched_label} | {emotion}")  # Debug: Confirm label display
+            else:
+                # Check if the face is within the capture range
+                if is_within_range(temp_id, (x1, y1, x2, y2)):
+                    face_ready_to_capture[temp_id] = True
+                    matched_label = "Ready"  # Indicate the face is ready to capture
+                    emotion = "N/A"
+                else:
+                    face_ready_to_capture[temp_id] = False
+                    matched_label = "Moving"
+                    emotion = "N/A"
+
+            # Store detection as a list instead of a tuple
+            current_detections.append([x1, y1, x2, y2, matched_label, emotion, temp_id])
 
         last_detections = current_detections  # Update the last detection results
 
+    # Check for keypress to capture
+    key = cv2.waitKey(1)
+    if key == ord('c'):  # Press 'c' to capture faces that are ready
+        print(f"Attempting to capture faces. Ready faces: {face_ready_to_capture}")  # Debug: Check ready faces
+        for temp_id in list(face_ready_to_capture.keys()):
+            if face_ready_to_capture.get(temp_id, False) and temp_id not in captured_faces:
+                face_img, gray_face, x1, y1, x2, y2 = last_face_data.get(temp_id, (None, None, None, None, None, None))
+                if face_img is None or gray_face is None:
+                    print(f"No face data for {temp_id}, skipping capture")  # Debug: Check face data
+                    continue  # Skip if no face data is available
+
+                wearing_mask = is_wearing_mask(face_img)
+                new_embedding = extract_embedding(gray_face, wearing_mask)
+
+                matched_label = "Unknown"
+                for name, stored_embeddings in reference_faces.items():
+                    if compare_faces_cosine(new_embedding, stored_embeddings):
+                        matched_label = name
+                        break
+
+                if matched_label == "Unknown":
+                    label = f"user{temp_id.split('_')[1]}.0_{datetime.now().strftime('%H%M%S')}"
+                    update_reference_faces(label, new_embedding)
+                    matched_label = label
+                    save_face_with_folder(face_img, label)
+                else:
+                    update_reference_faces(matched_label, new_embedding)
+
+                try:
+                    input_face = preprocess_emotion(gray_face)
+                    preds = emotion_model.predict(input_face, verbose=0)
+                    emotion = emotion_labels[np.argmax(preds)]
+                except:
+                    emotion = "N/A"
+
+                captured_faces[temp_id] = (matched_label, emotion)  # Store the label and emotion
+                print(f"Captured face {temp_id} with label: {matched_label} | Emotion: {emotion}")  # Debug: Confirm capture
+
+                # Update the detection label to reflect the captured state
+                for detection in last_detections:
+                    if detection[6] == temp_id:  # Match by temp_id
+                        detection[4] = matched_label  # Update label
+                        detection[5] = emotion  # Update emotion
+
     # Use the last detection results for drawing
     for detection in last_detections:
-        x1, y1, x2, y2, matched_label, emotion = detection
+        x1, y1, x2, y2, matched_label, emotion, _ = detection
         cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), LINE_THICKNESS)
         cv2.putText(frame, f"{matched_label} | {emotion}", (x1, y1-10),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), LINE_THICKNESS)
 
     cv2.imshow("YOLO + Emotion + Auto-folder", frame)
-    if cv2.waitKey(1) & 0xFF == 27:
+    if key == 27:  # Press ESC to exit
         break
 
 cap.release()
