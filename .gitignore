@@ -13,3 +13,4 @@ Test/FER
 Test/known_faces
 Image/
 .venv/
+/detected_faces
