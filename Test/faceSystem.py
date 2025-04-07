@@ -7,7 +7,7 @@ from datetime import datetime
 from sklearn.metrics.pairwise import cosine_similarity
 
 # === Load models ===
-model = YOLO("Test/Yolo/yolov8l-face.pt")  # Use yolov8l-face.pt
+model = YOLO("Test/Yolo/yolov10m-face.pt")  # Use yolov8l-face.pt
 emotion_model = load_model("/Users/sam/Documents/GitHub/fyp/Test/FER/model.h5")
 emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
 
