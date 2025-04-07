@@ -1,0 +1,14 @@
+pip install Flask
+pip install flask opencv-python
+pip install opencv-python-headless
+http://127.0.0.1:5000/
+
+conda activate (test_env1)
+conda activate test_env1
+conda deactivate
+conda env list
+conda list
+
+pip install -r requirements.txt
+https://github.com/serengil/deepface
+https://github.com/TadasBaltrusaitis/OpenFace
