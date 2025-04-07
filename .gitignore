@@ -11,4 +11,5 @@ Test/DNN
 Test/face_captures
 Test/FER
 Test/known_faces
-Images/
+Image/
+.venv/
