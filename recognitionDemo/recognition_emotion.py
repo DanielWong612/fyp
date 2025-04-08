@@ -4,7 +4,7 @@ import tensorflow as tf
 from tensorflow.keras.models import load_model
 
 # Load the pre-trained emotion recognition model
-emotion_model_path = "/Users/sam/Documents/GitHub/fyp/Test/FER/model.h5"
+emotion_model_path = "recognitionDemo/FER/model.h5"
 emotion_model = load_model(emotion_model_path)
 print("Emotion model input shape:", emotion_model.input_shape)  # Print model input shape for verification
 
@@ -12,8 +12,8 @@ print("Emotion model input shape:", emotion_model.input_shape)  # Print model in
 emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
 
 # Load DNN face detection model
-face_model_path = "/Users/sam/Documents/GitHub/fyp/Test/DNN/res10_300x300_ssd_iter_140000.caffemodel"
-face_config_path = "/Users/sam/Documents/GitHub/fyp/Test/DNN/deploy.prototxt"
+face_model_path = "recognitionDemo/DNN/res10_300x300_ssd_iter_140000.caffemodel"
+face_config_path = "recognitionDemo/DNN/deploy.prototxt"
 face_net = cv2.dnn.readNetFromCaffe(face_config_path, face_model_path)
 
 # Preprocess image for emotion recognition
