@@ -16,3 +16,4 @@ Image/
 detected_faces/
 temp_face.jpg
 Test/face_database/.DS_Store
+/Test/face_database
