@@ -8,7 +8,7 @@ from datetime import datetime
 
 # === 設置參數 ===
 model_path = "Test/Yolo/yolov8n-face.pt"  # YOLO 人臉檢測模型路徑
-capture_dir = "Test/face_database"        # 儲存捕獲人臉的目錄
+capture_dir = "Test/face_database"        # 儲存捕獲人臉的根目錄
 delay_frames = 5                          # 延遲捕獲的幀數
 similarity_threshold = 0.6                # 降低閾值以提高匹配成功率
 
@@ -18,13 +18,36 @@ model = YOLO(model_path)
 # === 已知人臉數據庫（初始為空） ===
 known_faces = {}  # {label: embedding} 用於儲存捕獲的人臉特徵
 
+# === 從目錄加載已知人臉特徵 ===
+def load_known_faces(capture_dir):
+    """從目錄加載已知人臉特徵"""
+    for user_dir in os.listdir(capture_dir):
+        user_path = os.path.join(capture_dir, user_dir)
+        if os.path.isdir(user_path):
+            for img_file in os.listdir(user_path):
+                img_path = os.path.join(user_path, img_file)
+                try:
+                    embedding = DeepFace.represent(
+                        img_path,
+                        model_name='Facenet',
+                        enforce_detection=False
+                    )[0]["embedding"]
+                    known_faces[user_dir] = embedding
+                    break  # 只取每用戶第一張圖片作為特徵
+                except Exception as e:
+                    print(f"處理 {img_path} 時出錯: {e}")
+
+# 初始加載已知人臉
+load_known_faces(capture_dir)
+
 # === 自動捕獲人臉 ===
 def auto_capture(face_img, label, capture_dir):
-    """將檢測到的人臉儲存到指定目錄並返回標籤"""
-    os.makedirs(capture_dir, exist_ok=True)
+    """將檢測到的人臉儲存到指定用戶子目錄並返回標籤"""
+    user_dir = os.path.join(capture_dir, label)  # 為每個用戶創建子目錄
+    os.makedirs(user_dir, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"{label}_{timestamp}.jpg"
-    filepath = os.path.join(capture_dir, filename)
+    filepath = os.path.join(user_dir, filename)
     cv2.imwrite(filepath, face_img)
     print(f"已捕獲人臉並儲存至: {filepath}")
     return label
