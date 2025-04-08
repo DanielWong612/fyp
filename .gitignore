@@ -6,21 +6,12 @@ unmatched_faces/
 /Users/sam/Documents/GitHub/fyp/Test/Classroom Analysis System_screenshot_10.01.2025.png
 22067588d_additional/
 22067588d_additional 2/
-Test/deepface
-Test/DNN
-Test/face_captures
-Test/FER
-Test/known_faces
 Image/
 .venv/
-detected_faces/
 temp_face.jpg
 Test/face_database/.DS_Store
-/Test/face_database
-/Test/face_database_save1/user_1
-/Test/face_database_save1
 
-
-detected_faces
-Test
+detected_faces/
+Test/
 /doc
+.vscode/
