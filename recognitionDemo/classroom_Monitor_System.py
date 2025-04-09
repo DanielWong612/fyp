@@ -32,18 +32,22 @@ mtcnn = MTCNN()
 emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
 
 # Known face database
-known_faces = {}
+known_faces = {}  # {sID: [embedding1, embedding2, ...]}
 
-# Load student list
+# Load student list from students.json
 def load_students():
     import json
-    with open('students.json', 'r', encoding='utf-8') as f:
-        return json.load(f)
+    try:
+        with open('students.json', 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print("students.json not found. Please create it with student data.")
+        return []
 
 students = load_students()
 student_ids = [student['sid'] for student in students]
 
-# Load known face features
+# Load known face features from directory
 def load_known_faces(capture_dir, student_ids):
     for sID in student_ids:
         user_path = os.path.join(capture_dir, sID)
@@ -161,8 +165,11 @@ def generate_processed_frames(selected_student=None, manual_capture_trigger=Fals
 
                     if manual_capture_trigger and selected_student == recognized_label and is_frontal_face(face_img):
                         manual_capture(face_img, recognized_label, capture_dir)
-                        known_faces[recognized_label].append(embedding)
-                        manual_capture_trigger = False
+                        if recognized_label in known_faces:
+                            known_faces[recognized_label].append(embedding)
+                        else:
+                            known_faces[recognized_label] = [embedding]
+                        manual_capture_trigger = False  # Reset trigger after capture
 
                 else:
                     cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 0), 2)
@@ -179,3 +186,25 @@ def generate_processed_frames(selected_student=None, manual_capture_trigger=Fals
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
     cap.release()
+
+if __name__ == "__main__":
+    # For standalone testing
+    def main():
+        load_known_faces(capture_dir, student_ids)
+        cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            print("Error: Camera not opened.")
+            return
+        window_name = "Face and Emotion Recognition"
+        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+        for frame in generate_processed_frames():
+            try:
+                frame = cv2.imdecode(np.frombuffer(frame.split(b'\r\n\r\n')[1], np.uint8), cv2.IMREAD_COLOR)
+                cv2.imshow(window_name, frame)
+                if cv2.waitKey(1) & 0xFF == 27:
+                    break
+            except Exception as e:
+                print(f"Error displaying frame: {e}")
+                break
+        cv2.destroyAllWindows()
+    main()
