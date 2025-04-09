@@ -1,35 +1,31 @@
 from flask import Flask, render_template, request, redirect, url_for, Response, jsonify
-import os, json, shutil, cv2
+import os, json, shutil
+from recognitionDemo.classroom_Monitor_System import generate_processed_frames
 
 app = Flask(__name__)
 
-# File paths and constants
-STUDENTS_FILE = 'students.json'        # JSON file storing student data
-PAIRINGS_FILE = 'face_pairings.json'   # JSON file storing face-student pairings
-FACE_DB_PATH = 'recognitionDemo/face_database'  # Directory for face images
-THUMB_DIR = 'static/thumbnails'        # Directory for thumbnail images
-DEFAULT_AVATAR = 'default_avatar.png'  # Default avatar if no face is paired
+STUDENTS_FILE = 'students.json'
+PAIRINGS_FILE = 'face_pairings.json'
+FACE_DB_PATH = 'recognitionDemo/face_database'
+THUMB_DIR = 'static/thumbnails'
+DEFAULT_AVATAR = 'default_avatar.png'
 
-# Load student data from JSON file
 def load_students():
     with open(STUDENTS_FILE, 'r', encoding='utf-8') as f:
         return json.load(f)
 
-# Load face-student pairings from JSON file
 def load_pairings():
     if not os.path.exists(PAIRINGS_FILE):
         return {}
     with open(PAIRINGS_FILE, 'r', encoding='utf-8') as f:
         return json.load(f)
 
-# Save a new face-student pairing to the JSON file
 def save_pairing(image, sid):
     pairings = load_pairings()
     pairings[image] = sid
     with open(PAIRINGS_FILE, 'w', encoding='utf-8') as f:
         json.dump(pairings, f, indent=2)
 
-# Get list of unpaired face images from the face database
 def get_first_face_images():
     if not os.path.exists(THUMB_DIR):
         os.makedirs(THUMB_DIR)
@@ -50,26 +46,16 @@ def get_first_face_images():
                     user_faces.append(thumb_name)
     return user_faces
 
-# Map face images to students for avatar display
 def map_student_faces(students, pairings):
-    sid_to_image = {v: k for k, v in pairings.items()}  # Reverse mapping: {sid: image}
+    sid_to_image = {v: k for k, v in pairings.items()}  # {sid: image.jpg}
     for student in students:
         image_name = sid_to_image.get(student['sid'])
-        student['avatar'] = f"thumbnails/{image_name}" if image_name else DEFAULT_AVATAR
+        if image_name:
+            student['avatar'] = f"thumbnails/{image_name}"
+        else:
+            student['avatar'] = DEFAULT_AVATAR
     return students
 
-# Generate video frames for the live camera feed
-def generate_frames():
-    cap = cv2.VideoCapture(0)
-    while True:
-        success, frame = cap.read()
-        if not success:
-            break
-        _, buffer = cv2.imencode('.jpg', frame)
-        frame = buffer.tobytes()
-        yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-
-# Route for the homepage
 @app.route('/')
 def index():
     students = load_students()
@@ -78,19 +64,16 @@ def index():
     unpaired_faces = get_first_face_images()
     return render_template('index.html', students=students, unpaired_faces=unpaired_faces)
 
-# Route to handle pairing requests (returns JSON instead of redirecting)
 @app.route('/pair', methods=['POST'])
 def pair():
-    image = request.form['image']           # Face image filename
-    student_sid = request.form['student_sid']  # Student ID
-    save_pairing(image, student_sid)        # Save the pairing
-    # Return a JSON response to confirm success
+    image = request.form['image']
+    student_sid = request.form['student_sid']
+    save_pairing(image, student_sid)
     return jsonify({'success': True, 'image': image, 'student_sid': student_sid})
 
-# Route for the live video feed
-@app.route('/video_feed')
-def video_feed():
-    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+@app.route('/processed_video_feed')
+def processed_video_feed():
+    return Response(generate_processed_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 if __name__ == '__main__':
     app.run(debug=True)
