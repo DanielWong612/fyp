@@ -74,6 +74,7 @@ def pair():
 def manual_capture_route():
     selected_student = request.form['student_sid']
     return Response(generate_processed_frames(selected_student=selected_student, manual_capture_trigger=True), mimetype='multipart/x-mixed-replace; boundary=frame')
+
 @app.route('/processed_video_feed')
 def processed_video_feed():
     return Response(generate_processed_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')

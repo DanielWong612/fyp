@@ -91,6 +91,8 @@
           studentItem.querySelector('img').src = `{{ url_for('static', filename='thumbnails/') }}${face}`;
           selectedStudent = null;
           document.querySelectorAll('#student-list li').forEach(li => li.classList.remove('bg-purple-600'));
+          // Refresh the video feed to reflect the new pairing
+          document.getElementById('video-feed').src = "{{ url_for('processed_video_feed') }}";
         }
       })
       .catch(error => {
@@ -100,8 +102,8 @@
     }
 
     function manualCapture(sid, event) {
-      event.stopPropagation(); // Prevent triggering selectStudent
-      fetch("{{ url_for('manual_capture_route') }}", {  // Changed from 'manual_capture' to 'manual_capture_route'
+      event.stopPropagation();
+      fetch("{{ url_for('manual_capture_route') }}", {
         method: "POST",
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ student_sid: sid })
@@ -109,7 +111,6 @@
       .then(response => {
         if (response.ok) {
           console.log(`Manual capture triggered for student ${sid}`);
-          // Optionally refresh the video feed
           document.getElementById('video-feed').src = "{{ url_for('processed_video_feed') }}";
         } else {
           throw new Error('Manual capture failed');
