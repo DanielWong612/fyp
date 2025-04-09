@@ -11,3 +11,6 @@ recognitionDemo/FER/model.h5
 /__pycache__
 /recognitionDemo/__pycache__
 /recognitionDemo/face_database copy
+/face_database
+__MACOSX/
+face_recognition.log
