@@ -32,6 +32,7 @@
       <div id="resizable-camera-wrapper" class="mx-auto">
         <img src="{{ url_for('processed_video_feed') }}" alt="Processed video feed" id="video-feed">
       </div>
+      <button onclick="captureFace()" class="mt-4 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Capture All Detected Faces</button>
     </div>
 
     <div class="w-full lg:w-80 bg-gray-800 p-4 overflow-y-auto border-t lg:border-t-0 lg:border-l border-gray-700">
@@ -45,7 +46,6 @@
             <div class="text-sm text-gray-300">ID: {{ student.sid }}</div>
             <div class="text-sm text-gray-400">Dept: {{ student.dept }}</div>
           </div>
-          <button onclick="manualCapture('{{ student.sid }}', event)" class="ml-auto bg-blue-600 text-white py-1 px-2 rounded hover:bg-blue-700">Capture</button>
         </li>
         {% endfor %}
       </ul>
@@ -55,12 +55,12 @@
   <div class="p-6 bg-gray-100 text-gray-900">
     <h3 class="text-xl font-bold mb-4 flex items-center gap-2">🧠 AI Detected Faces (To Pair)</h3>
     <div id="face-list" class="flex flex-wrap gap-6">
-      {% for face in unpaired_faces %}
-      <div id="face-card-{{ face }}" class="bg-white text-black rounded-lg shadow-md p-4 w-52 text-center hover:shadow-lg transition cursor-pointer" onclick="pairFace('{{ face }}')">
-        <img src="{{ url_for('static', filename='thumbnails/' + face) }}" class="w-24 h-24 mx-auto object-cover border-4 border-purple-400 mb-2" alt="Detected face">
-        <p>{{ face }}</p>
-      </div>
-      {% endfor %}
+        {% for face in detected_faces %}
+        <div id="face-card-{{ loop.index }}" class="bg-white text-black rounded-lg shadow-md p-4 w-52 text-center hover:shadow-lg transition cursor-pointer">
+            <img src="{{ url_for('static', filename='thumbnails/' + face) }}" class="w-24 h-24 mx-auto object-cover border-4 border-purple-400 mb-2" alt="Detected face">
+            <button onclick="captureFace()" class="mt-2 w-full bg-blue-600 text-white py-1 rounded hover:bg-blue-700">Capture</button>
+        </div>
+        {% endfor %}
     </div>
   </div>
 
@@ -121,6 +121,26 @@
         alert('An error occurred during manual capture. Please try again.');
       });
     }
+
+    function captureFace() {
+        fetch("{{ url_for('capture_face') }}", {
+            method: "POST",
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`Captured ${data.captured_faces} unique unknown faces!`);
+                location.reload();  //Reload the page to update the list of unpaired faces.
+            }
+        })
+        .catch(error => {
+            console.error('Error during capture:', error);
+            alert('An error occurred while capturing. Please try again.');
+        });
+    }
+    
   </script>
 </body>
 </html>

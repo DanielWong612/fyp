@@ -2,7 +2,8 @@ from flask import Flask, render_template, request, Response, jsonify
 import os
 import json
 import shutil
-from recognitionDemo.classroom_Monitor_System import generate_processed_frames
+from recognitionDemo.classroom_Monitor_System import generate_processed_frames, detected_faces, known_faces, auto_capture,capture_face_from_current_frame
+import cv2
 
 app = Flask(__name__)
 
@@ -67,6 +68,12 @@ def index():
 def pair():
     image = request.form['image']
     student_sid = request.form['student_sid']
+    # Move the image to the student's directory
+    src_path = os.path.join(FACE_DB_PATH, image)
+    dst_dir = os.path.join(FACE_DB_PATH, student_sid)
+    os.makedirs(dst_dir, exist_ok=True)
+    dst_path = os.path.join(dst_dir, image)
+    shutil.move(src_path, dst_path)
     save_pairing(image, student_sid)
     return jsonify({'success': True, 'image': image, 'student_sid': student_sid})
 
@@ -78,6 +85,32 @@ def manual_capture_route():
 @app.route('/processed_video_feed')
 def processed_video_feed():
     return Response(generate_processed_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/capture_face', methods=['POST'])
+def capture_face():
+    captured_faces = capture_face_from_current_frame()
+    return jsonify({'success': True, 'captured_faces': len(captured_faces)})
+
+@app.route('/capture_all_faces', methods=['POST'])
+def capture_all_faces():
+    for i, face_img in enumerate(detected_faces):
+        filename = f"user_{i + 1}.png"
+        filepath = os.path.join(FACE_DB_PATH, filename)
+        cv2.imwrite(filepath, face_img)
+        
+        # Checking for Matched Students
+        pairings = load_pairings()
+        if filename in pairings:
+            student_sid = pairings[filename]
+            # Create student folder (if it does not exist)
+            student_dir = os.path.join(FACE_DB_PATH, student_sid)
+            os.makedirs(student_dir, exist_ok=True)
+            # Moving Photos to Student Folders
+            dst_path = os.path.join(student_dir, filename)
+            shutil.move(filepath, dst_path)
+    
+    detected_faces.clear()  # Clear List
+    return jsonify({'success': True})
 
 if __name__ == '__main__':
     app.run(debug=True)
