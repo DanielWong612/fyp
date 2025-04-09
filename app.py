@@ -1,14 +1,88 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, Response
+import os, json, shutil, cv2
 
 app = Flask(__name__)
 
+STUDENTS_FILE = 'students.json'
+PAIRINGS_FILE = 'face_pairings.json'
+FACE_DB_PATH = 'recognitionDemo/face_database'
+THUMB_DIR = 'static/thumbnails'
+DEFAULT_AVATAR = 'default_avatar.png'
+
+def load_students():
+    with open(STUDENTS_FILE, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def load_pairings():
+    if not os.path.exists(PAIRINGS_FILE):
+        return {}
+    with open(PAIRINGS_FILE, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def save_pairing(image, sid):
+    pairings = load_pairings()
+    pairings[image] = sid
+    with open(PAIRINGS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(pairings, f, indent=2)
+
+def get_first_face_images():
+    if not os.path.exists(THUMB_DIR):
+        os.makedirs(THUMB_DIR)
+    pairings = load_pairings()
+    user_faces = []
+    for user_folder in sorted(os.listdir(FACE_DB_PATH)):
+        user_path = os.path.join(FACE_DB_PATH, user_folder)
+        if os.path.isdir(user_path):
+            images = [f for f in os.listdir(user_path) if f.lower().endswith(('.jpg', '.png'))]
+            if images:
+                first_img = images[0]
+                src_path = os.path.join(user_path, first_img)
+                thumb_name = f"{user_folder}_{first_img}"
+                dst_path = os.path.join(THUMB_DIR, thumb_name)
+                if not os.path.exists(dst_path):
+                    shutil.copy(src_path, dst_path)
+                if thumb_name not in pairings:
+                    user_faces.append(thumb_name)
+    return user_faces
+
+def map_student_faces(students, pairings):
+    sid_to_image = {v: k for k, v in pairings.items()}  # {sid: image.jpg}
+    for student in students:
+        image_name = sid_to_image.get(student['sid'])
+        if image_name:
+            student['avatar'] = f"thumbnails/{image_name}"
+        else:
+            student['avatar'] = DEFAULT_AVATAR
+    return students
+
+def generate_frames():
+    cap = cv2.VideoCapture(0)
+    while True:
+        success, frame = cap.read()
+        if not success:
+            break
+        _, buffer = cv2.imencode('.jpg', frame)
+        frame = buffer.tobytes()
+        yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+
 @app.route('/')
 def index():
-    return render_template("index.html")
+    students = load_students()
+    pairings = load_pairings()
+    students = map_student_faces(students, pairings)
+    unpaired_faces = get_first_face_images()
+    return render_template('index.html', students=students, unpaired_faces=unpaired_faces)
 
-@app.route('/page')
-def page():
-    return render_template("page.html")
+@app.route('/pair', methods=['POST'])
+def pair():
+    image = request.form['image']
+    student_sid = request.form['student_sid']
+    save_pairing(image, student_sid)
+    return redirect(url_for('index'))
+
+@app.route('/video_feed')
+def video_feed():
+    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 if __name__ == '__main__':
     app.run(debug=True)

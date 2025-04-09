@@ -1,0 +1,21 @@
+[
+    {
+      "name": "Alice",
+      "sid": "22067588D",
+      "dept": "COMP",
+      "image": ""
+    },
+    {
+      "name": "Bob",
+      "sid": "22068888D",
+      "dept": "SEEM",
+      "image": ""
+    },
+    {
+      "name": "Charlie",
+      "sid": "22069999D",
+      "dept": "SD",
+      "image": ""
+    }
+  ]
+  

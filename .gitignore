@@ -7,3 +7,5 @@ recognitionDemo/FER/model.h5
 /Image
 /recognitionDemo/DNN
 /recognitionDemo/face_database
+/static/thumbnails
+/__pycache__
