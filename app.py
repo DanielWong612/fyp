@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, Response, jsonify
+from flask import Flask, render_template, request, Response, jsonify
 import os, json, shutil
 from recognitionDemo.classroom_Monitor_System import generate_processed_frames
 
@@ -47,13 +47,10 @@ def get_first_face_images():
     return user_faces
 
 def map_student_faces(students, pairings):
-    sid_to_image = {v: k for k, v in pairings.items()}  # {sid: image.jpg}
+    sid_to_image = {v: k for k, v in pairings.items()}
     for student in students:
         image_name = sid_to_image.get(student['sid'])
-        if image_name:
-            student['avatar'] = f"thumbnails/{image_name}"
-        else:
-            student['avatar'] = DEFAULT_AVATAR
+        student['avatar'] = f"thumbnails/{image_name}" if image_name else DEFAULT_AVATAR
     return students
 
 @app.route('/')
@@ -70,6 +67,11 @@ def pair():
     student_sid = request.form['student_sid']
     save_pairing(image, student_sid)
     return jsonify({'success': True, 'image': image, 'student_sid': student_sid})
+
+@app.route('/manual_capture', methods=['POST'])
+def manual_capture():
+    selected_student = request.form['student_sid']
+    return Response(generate_processed_frames(selected_student=selected_student, manual_capture_trigger=True), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/processed_video_feed')
 def processed_video_feed():
