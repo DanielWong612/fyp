@@ -1,16 +1,16 @@
-.venv/
-temp_face.jpg
-Test/
+/__MACOSX
+/__pycache__
+/.venv
+/.vscode
 /doc
-.vscode/
-recognitionDemo/FER/model.h5
+/face_database
 /Image
+/recognitionDemo/__pycache__
 /recognitionDemo/DNN
 /recognitionDemo/face_database
-/static/thumbnails
-/__pycache__
-/recognitionDemo/__pycache__
 /recognitionDemo/face_database copy
-/face_database
-__MACOSX/
+recognitionDemo/FER/model.h5
+/static/thumbnails
+/Test
 face_recognition.log
+temp_face.jpg
