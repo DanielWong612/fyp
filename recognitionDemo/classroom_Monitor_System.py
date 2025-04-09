@@ -10,7 +10,7 @@ import time
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 import json
-
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 # Set parameters
 yolo_model_path = "recognitionDemo/Yolo/yolov8n-face.pt"  # Path to YOLO face detection model
 emotion_model_path = "recognitionDemo/FER/model.h5"  # Path to emotion recognition model
