@@ -70,20 +70,23 @@
     <div class="p-6 bg-gray-100 text-gray-900">
         <h3 class="text-xl font-bold mb-4 flex items-center gap-2">🧠 AI Detected Faces (To Pair)</h3>
         <div id="face-list" class="flex flex-wrap gap-6">
-          {% if unpaired_faces %}
+            {% if unpaired_faces %}
             {% for face in unpaired_faces %}
-            <div id="face-card-{{ face.label }}" class="bg-white text-black rounded-lg shadow-md p-4 w-52 text-center hover:shadow-lg transition cursor-pointer">
-              <img src="/{{ face.filepath }}" class="w-24 h-24 mx-auto object-cover border-4 border-purple-400 mb-2" alt="Detected face">
-              <button onclick="pairFace('{{ face.label }}')" class="mt-2 w-full bg-purple-600 text-white py-1 rounded hover:bg-purple-700">
-                Pair
-              </button>
+            <div id="face-card-{{ face.label }}"
+                class="bg-white text-black rounded-lg shadow-md p-4 w-52 text-center hover:shadow-lg transition cursor-pointer">
+                <img src="/{{ face.filepath }}" class="w-24 h-24 mx-auto object-cover border-4 border-purple-400 mb-2"
+                    alt="Detected face">
+                <button onclick="pairFace('{{ face.label }}')"
+                    class="mt-2 w-full bg-purple-600 text-white py-1 rounded hover:bg-purple-700">
+                    Pair
+                </button>
             </div>
             {% endfor %}
-          {% else %}
+            {% else %}
             <p class="text-gray-500">No unpaired faces detected.</p>
-          {% endif %}
+            {% endif %}
         </div>
-      </div>
+    </div>
 
     <script>
         let selectedStudent = null;

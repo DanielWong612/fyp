@@ -93,8 +93,8 @@ def capture_face():
 @app.route('/capture_all_faces', methods=['POST'])
 def capture_all_faces():
     for i, face_img in enumerate(detected_faces):
-        filename = f"user_{i + 1}.png"
-        filepath = os.path.join(FACE_DB_PATH, filename)
+        filename = f"user_{i + 1}.png"  # e.g user_1.png
+        filepath = os.path.join(FACE_DB_PATH, filename)  # Save Path：static/face_database/user_1.png
         cv2.imwrite(filepath, face_img)
         
         # Checking for Matched Students
@@ -105,7 +105,7 @@ def capture_all_faces():
             student_dir = os.path.join(FACE_DB_PATH, student_sid)
             os.makedirs(student_dir, exist_ok=True)
             # Moving Photos to Student Folders
-            dst_path = os.path.join(student_dir, filename)
+            dst_path = os.path.join(student_dir, filename)  # moving to  static/face_database/studentID/user_1.png
             shutil.move(filepath, dst_path)
     
     detected_faces.clear()  # Clear List

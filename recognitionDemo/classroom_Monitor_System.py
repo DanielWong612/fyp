@@ -16,7 +16,8 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 # Set parameters
 yolo_model_path = "recognitionDemo/Yolo/yolov8n-face.pt"
 emotion_model_path = "recognitionDemo/FER/model.h5"
-capture_dir = "recognitionDemo/face_database"
+# capture_dir = "recognitionDemo/face_database"
+capture_dir = "static/face_database"
 delay_frames = 5
 similarity_threshold = 0.6
 high_similarity_threshold = 0.8
@@ -91,13 +92,15 @@ def is_frontal_face(face_img):
 
 # Save face image
 def auto_capture(face_img, label, capture_dir):
-    user_dir = os.path.join(capture_dir, label)
-    os.makedirs(user_dir, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"{label}_{timestamp}.jpg"
-    filepath = os.path.join(user_dir, filename)
+    base_filename = f"{label}.jpg"
+    filepath = os.path.join(capture_dir, base_filename)
+    counter = 1
+    while os.path.exists(filepath):  # If the file already exists, increment the number
+        new_filename = f"{label}_{counter}.jpg"
+        filepath = os.path.join(capture_dir, new_filename)
+        counter += 1
     cv2.imwrite(filepath, face_img)
-    print(f"Saved frontal face to: {filepath}")
+    print(f"Saved face to: {filepath}")
     return filepath
 
 # Recognize face
@@ -265,6 +268,7 @@ def main():
     cv2.destroyAllWindows()
     detected_faces.clear()
     seen_faces.clear()
+
 def capture_unique_unknown_faces(frame):
     """Capture unique unknown faces from a single frame and return them."""
     results = yolo_model.predict(source=frame, conf=0.25, imgsz=640, verbose=False)
@@ -293,11 +297,11 @@ def capture_unique_unknown_faces(frame):
                 if box_key not in unique_faces:  # Avoid duplicates in the same frame
                     unique_faces[box_key] = face_img
 
-    # storage unique unknown faces and updated known_faces
+    # Storage unique unknown faces and update known_faces
     captured_faces = []
     for i, (box_key, face_img) in enumerate(unique_faces.items()):
-        new_label = f"user_{len(known_faces) + i + 1}"
-        filepath = auto_capture(face_img, new_label, capture_dir)
+        new_label = f"user_{len(known_faces) + i + 1}"  # e.g user_1, user_2
+        filepath = auto_capture(face_img, new_label, capture_dir)  # Save to static/face_database/user_1.jpg
         known_faces[new_label] = [DeepFace.represent(
             face_img,
             model_name='Facenet',
@@ -306,6 +310,7 @@ def capture_unique_unknown_faces(frame):
         captured_faces.append({'label': new_label, 'filepath': filepath})
 
     return captured_faces
+
 def capture_face_from_current_frame():
     """Capture all unique unknown faces from the current frame."""
     cap = cv2.VideoCapture(0)
