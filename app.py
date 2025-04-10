@@ -9,7 +9,7 @@ app = Flask(__name__)
 
 STUDENTS_FILE = 'students.json'
 PAIRINGS_FILE = 'face_pairings.json'
-FACE_DB_PATH = 'recognitionDemo/face_database'
+FACE_DB_PATH = 'static/face_database'
 THUMB_DIR = 'static/thumbnails'
 DEFAULT_AVATAR = 'default_avatar.png'
 
@@ -34,19 +34,18 @@ def get_first_face_images():
         os.makedirs(THUMB_DIR)
     pairings = load_pairings()
     user_faces = []
-    for user_folder in sorted(os.listdir(FACE_DB_PATH)):
-        user_path = os.path.join(FACE_DB_PATH, user_folder)
-        if os.path.isdir(user_path):
-            images = [f for f in os.listdir(user_path) if f.lower().endswith(('.jpg', '.png'))]
-            if images:
-                first_img = images[0]
-                src_path = os.path.join(user_path, first_img)
-                thumb_name = f"{user_folder}_{first_img}"
+    
+    for filename in sorted(os.listdir(FACE_DB_PATH)):
+        if filename.startswith('user') and filename.lower().endswith('.jpg'):
+            src_path = os.path.join(FACE_DB_PATH, filename)
+            if os.path.isfile(src_path): 
+                thumb_name = filename
                 dst_path = os.path.join(THUMB_DIR, thumb_name)
                 if not os.path.exists(dst_path):
                     shutil.copy(src_path, dst_path)
                 if thumb_name not in pairings:
-                    user_faces.append(thumb_name)
+                    user_faces.append({'label': filename, 'filepath': src_path})
+    
     return user_faces
 
 def map_student_faces(students, pairings):
@@ -66,13 +65,13 @@ def index():
 
 @app.route('/pair', methods=['POST'])
 def pair():
-    image = request.form['image']
-    student_sid = request.form['student_sid']
-    # Move the image to the student's directory
-    src_path = os.path.join(FACE_DB_PATH, image)
-    dst_dir = os.path.join(FACE_DB_PATH, student_sid)
+    image = request.form['image']  
+    student_sid = request.form['student_sid']  
+    # 移動圖片到學生的目錄
+    src_path = os.path.join(FACE_DB_PATH, image)  # recognitionDemo/face_database/user1.jpg
+    dst_dir = os.path.join(FACE_DB_PATH, student_sid)  # recognitionDemo/face_database/220675880
     os.makedirs(dst_dir, exist_ok=True)
-    dst_path = os.path.join(dst_dir, image)
+    dst_path = os.path.join(dst_dir, image)  # recognitionDemo/face_database/220675880/user1.jpg
     shutil.move(src_path, dst_path)
     save_pairing(image, student_sid)
     return jsonify({'success': True, 'image': image, 'student_sid': student_sid})

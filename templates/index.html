@@ -1,146 +1,167 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8">
-  <title>Classroom Face Pairing</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-thumb { background-color: #4B5563; border-radius: 3px; }
-    #resizable-camera-wrapper {
-      position: relative;
-      width: 100%;
-      max-width: 100%;
-      aspect-ratio: 16 / 9;
-      resize: both;
-      overflow: hidden;
-      border: 4px solid #374151;
-    }
-    #resizable-camera-wrapper img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>Classroom Face Pairing</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background-color: #4B5563;
+            border-radius: 3px;
+        }
+
+        #resizable-camera-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 100%;
+            aspect-ratio: 16 / 9;
+            resize: both;
+            overflow: hidden;
+            border: 4px solid #374151;
+        }
+
+        #resizable-camera-wrapper img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+    </style>
 </head>
+
 <body class="bg-gray-900 text-white font-sans">
-  <div class="flex flex-col lg:flex-row">
-    <div class="flex-1 p-6 bg-black">
-      <h2 class="text-xl text-purple-300 font-bold mb-3 flex items-center gap-2">
-        <span>📹</span> Live Classroom Feed
-      </h2>
-      <div id="resizable-camera-wrapper" class="mx-auto">
-        <img src="{{ url_for('processed_video_feed') }}" alt="Processed video feed" id="video-feed">
-      </div>
-      <button onclick="captureFace()" class="mt-4 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Capture All Detected Faces</button>
-    </div>
-
-    <div class="w-full lg:w-80 bg-gray-800 p-4 overflow-y-auto border-t lg:border-t-0 lg:border-l border-gray-700">
-      <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">🧑‍🏫 Student List</h3>
-      <ul id="student-list" class="space-y-3">
-        {% for student in students %}
-        <li data-sid="{{ student.sid }}" class="bg-gray-700 p-3 rounded-lg flex gap-3 items-center shadow hover:bg-gray-600 transition cursor-pointer" onclick="selectStudent('{{ student.sid }}')">
-          <img src="{{ url_for('static', filename=student.avatar) }}" class="w-12 h-12 object-cover border-2 border-white" alt="Student avatar">
-          <div>
-            <div class="font-bold text-lg">{{ student.name }}</div>
-            <div class="text-sm text-gray-300">ID: {{ student.sid }}</div>
-            <div class="text-sm text-gray-400">Dept: {{ student.dept }}</div>
-          </div>
-        </li>
-        {% endfor %}
-      </ul>
-    </div>
-  </div>
-
-  <div class="p-6 bg-gray-100 text-gray-900">
-    <h3 class="text-xl font-bold mb-4 flex items-center gap-2">🧠 AI Detected Faces (To Pair)</h3>
-    <div id="face-list" class="flex flex-wrap gap-6">
-        {% for face in detected_faces %}
-        <div id="face-card-{{ loop.index }}" class="bg-white text-black rounded-lg shadow-md p-4 w-52 text-center hover:shadow-lg transition cursor-pointer">
-            <img src="{{ url_for('static', filename='thumbnails/' + face) }}" class="w-24 h-24 mx-auto object-cover border-4 border-purple-400 mb-2" alt="Detected face">
-            <button onclick="captureFace()" class="mt-2 w-full bg-blue-600 text-white py-1 rounded hover:bg-blue-700">Capture</button>
+    <div class="flex flex-col lg:flex-row">
+        <div class="flex-1 p-6 bg-black">
+            <h2 class="text-xl text-purple-300 font-bold mb-3 flex items-center gap-2">
+                <span>📹</span> Live Classroom Feed
+            </h2>
+            <div id="resizable-camera-wrapper" class="mx-auto">
+                <img src="{{ url_for('processed_video_feed') }}" alt="Processed video feed" id="video-feed">
+            </div>
+            <button onclick="captureFace()"
+                class="mt-4 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Capture All Detected
+                Faces</button>
         </div>
-        {% endfor %}
+
+        <div class="w-full lg:w-80 bg-gray-800 p-4 overflow-y-auto border-t lg:border-t-0 lg:border-l border-gray-700">
+            <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">🧑‍🏫 Student List</h3>
+            <ul id="student-list" class="space-y-3">
+                {% for student in students %}
+                <li data-sid="{{ student.sid }}"
+                    class="bg-gray-700 p-3 rounded-lg flex gap-3 items-center shadow hover:bg-gray-600 transition cursor-pointer"
+                    onclick="selectStudent('{{ student.sid }}')">
+                    <img src="{{ url_for('static', filename=student.avatar) }}"
+                        class="w-12 h-12 object-cover border-2 border-white" alt="Student avatar">
+                    <div>
+                        <div class="font-bold text-lg">{{ student.name }}</div>
+                        <div class="text-sm text-gray-300">ID: {{ student.sid }}</div>
+                        <div class="text-sm text-gray-400">Dept: {{ student.dept }}</div>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
     </div>
-  </div>
 
-  <script>
-    let selectedStudent = null;
+    <div class="p-6 bg-gray-100 text-gray-900">
+        <h3 class="text-xl font-bold mb-4 flex items-center gap-2">🧠 AI Detected Faces (To Pair)</h3>
+        <div id="face-list" class="flex flex-wrap gap-6">
+          {% if unpaired_faces %}
+            {% for face in unpaired_faces %}
+            <div id="face-card-{{ face.label }}" class="bg-white text-black rounded-lg shadow-md p-4 w-52 text-center hover:shadow-lg transition cursor-pointer">
+              <img src="/{{ face.filepath }}" class="w-24 h-24 mx-auto object-cover border-4 border-purple-400 mb-2" alt="Detected face">
+              <button onclick="pairFace('{{ face.label }}')" class="mt-2 w-full bg-purple-600 text-white py-1 rounded hover:bg-purple-700">
+                Pair
+              </button>
+            </div>
+            {% endfor %}
+          {% else %}
+            <p class="text-gray-500">No unpaired faces detected.</p>
+          {% endif %}
+        </div>
+      </div>
 
-    function selectStudent(sid) {
-      selectedStudent = sid;
-      document.querySelectorAll('#student-list li').forEach(li => li.classList.remove('bg-purple-600'));
-      document.querySelector(`#student-list li[data-sid="${sid}"]`).classList.add('bg-purple-600');
-    }
+    <script>
+        let selectedStudent = null;
 
-    function pairFace(face) {
-      if (!selectedStudent) {
-        alert('Please select a student first!');
-        return;
-      }
-      fetch("{{ url_for('pair') }}", {
-        method: "POST",
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ image: face, student_sid: selectedStudent })
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          document.getElementById(`face-card-${face}`).remove();
-          const studentItem = document.querySelector(`#student-list li[data-sid="${selectedStudent}"]`);
-          studentItem.querySelector('img').src = `{{ url_for('static', filename='thumbnails/') }}${face}`;
-          selectedStudent = null;
-          document.querySelectorAll('#student-list li').forEach(li => li.classList.remove('bg-purple-600'));
-          // Refresh the video feed to reflect the new pairing
-          document.getElementById('video-feed').src = "{{ url_for('processed_video_feed') }}";
+        function selectStudent(sid) {
+            selectedStudent = sid;
+            document.querySelectorAll('#student-list li').forEach(li => li.classList.remove('bg-purple-600'));
+            document.querySelector(`#student-list li[data-sid="${sid}"]`).classList.add('bg-purple-600');
         }
-      })
-      .catch(error => {
-        console.error('Error during pairing:', error);
-        alert('An error occurred while pairing. Please try again.');
-      });
-    }
 
-    function manualCapture(sid, event) {
-      event.stopPropagation();
-      fetch("{{ url_for('manual_capture_route') }}", {
-        method: "POST",
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ student_sid: sid })
-      })
-      .then(response => {
-        if (response.ok) {
-          console.log(`Manual capture triggered for student ${sid}`);
-          document.getElementById('video-feed').src = "{{ url_for('processed_video_feed') }}";
-        } else {
-          throw new Error('Manual capture failed');
-        }
-      })
-      .catch(error => {
-        console.error('Error during manual capture:', error);
-        alert('An error occurred during manual capture. Please try again.');
-      });
-    }
-
-    function captureFace() {
-        fetch("{{ url_for('capture_face') }}", {
-            method: "POST",
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({})
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert(`Captured ${data.captured_faces} unique unknown faces!`);
-                location.reload();  //Reload the page to update the list of unpaired faces.
+        function pairFace(face) {
+            if (!selectedStudent) {
+                alert('Please select a student first!');
+                return;
             }
-        })
-        .catch(error => {
-            console.error('Error during capture:', error);
-            alert('An error occurred while capturing. Please try again.');
-        });
-    }
-    
-  </script>
+            fetch("{{ url_for('pair') }}", {
+                method: "POST",
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ image: face, student_sid: selectedStudent })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById(`face-card-${face}`).remove();  // 移除已配對的圖片
+                        const studentItem = document.querySelector(`#student-list li[data-sid="${selectedStudent}"]`);
+                        studentItem.querySelector('img').src = `{{ url_for('static', filename='thumbnails/') }}${face}`;  // 更新學生頭像
+                        selectedStudent = null;
+                        document.querySelectorAll('#student-list li').forEach(li => li.classList.remove('bg-purple-600'));  // 取消選擇狀態
+                        document.getElementById('video-feed').src = "{{ url_for('processed_video_feed') }}";  // 刷新視頻流
+                    }
+                })
+                .catch(error => {
+                    console.error('Error during pairing:', error);
+                    alert('An error occurred while pairing. Please try again.');
+                });
+        }
+
+        function manualCapture(sid, event) {
+            event.stopPropagation();
+            fetch("{{ url_for('manual_capture_route') }}", {
+                method: "POST",
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ student_sid: sid })
+            })
+                .then(response => {
+                    if (response.ok) {
+                        console.log(`Manual capture triggered for student ${sid}`);
+                        document.getElementById('video-feed').src = "{{ url_for('processed_video_feed') }}";
+                    } else {
+                        throw new Error('Manual capture failed');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error during manual capture:', error);
+                    alert('An error occurred during manual capture. Please try again.');
+                });
+        }
+
+        function captureFace() {
+            fetch("{{ url_for('capture_face') }}", {
+                method: "POST",
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({})
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(`Captured ${data.captured_faces} unique unknown faces!`);
+                        location.reload();  //Reload the page to update the list of unpaired faces.
+                    }
+                })
+                .catch(error => {
+                    console.error('Error during capture:', error);
+                    alert('An error occurred while capturing. Please try again.');
+                });
+        }
+
+    </script>
 </body>
+
 </html>
