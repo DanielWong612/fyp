@@ -69,6 +69,7 @@
 
     <div class="p-6 bg-gray-100 text-gray-900">
         <h3 class="text-xl font-bold mb-4 flex items-center gap-2">AI Detected Faces (To Pair)</h3>
+        <p class="text-sm text-gray-500">Max Recognizable People: {{ max_recognizable_people }}</p>
         <div id="face-list" class="flex flex-wrap gap-6">
             {% if unpaired_faces %}
             {% for face in unpaired_faces %}

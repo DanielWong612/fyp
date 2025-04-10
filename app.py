@@ -10,7 +10,6 @@ app = Flask(__name__)
 STUDENTS_FILE = 'students.json'
 PAIRINGS_FILE = 'face_pairings.json'
 FACE_DB_PATH = 'static/face_database'
-THUMB_DIR = 'static/thumbnails'
 DEFAULT_AVATAR = 'default_avatar.png'
 
 def load_students():
@@ -30,8 +29,6 @@ def save_pairing(image, sid):
         json.dump(pairings, f, indent=2)
 
 def get_first_face_images():
-    if not os.path.exists(THUMB_DIR):
-        os.makedirs(THUMB_DIR)
     pairings = load_pairings()
     user_faces = []
     
@@ -39,20 +36,24 @@ def get_first_face_images():
         if filename.startswith('user') and filename.lower().endswith('.jpg'):
             src_path = os.path.join(FACE_DB_PATH, filename)
             if os.path.isfile(src_path): 
-                thumb_name = filename
-                dst_path = os.path.join(THUMB_DIR, thumb_name)
-                if not os.path.exists(dst_path):
-                    shutil.copy(src_path, dst_path)
-                if thumb_name not in pairings:
+                if filename not in pairings:
                     user_faces.append({'label': filename, 'filepath': src_path})
     
     return user_faces
 
 def map_student_faces(students, pairings):
-    sid_to_image = {v: k for k, v in pairings.items()}
     for student in students:
-        image_name = sid_to_image.get(student['sid'])
-        student['avatar'] = f"thumbnails/{image_name}" if image_name else DEFAULT_AVATAR
+        student_dir = os.path.join(FACE_DB_PATH, student['sid'])
+        if os.path.exists(student_dir):
+            # 獲取學生目錄下的第一張照片
+            for filename in os.listdir(student_dir):
+                if filename.lower().endswith(('.jpg', '.jpeg', '.png')):
+                    student['avatar'] = f"face_database/{student['sid']}/{filename}"
+                    break
+            else:
+                student['avatar'] = DEFAULT_AVATAR
+        else:
+            student['avatar'] = DEFAULT_AVATAR
     return students
 
 @app.route('/')

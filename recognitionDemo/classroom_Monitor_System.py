@@ -53,6 +53,7 @@ def load_students():
         return [], {}
 
 students, sid_to_name = load_students()
+max_recognizable_people = len(students)  # 設定可辨認的人數上限
 
 # Load known face features from directory
 def load_known_faces(capture_dir):
@@ -127,9 +128,7 @@ def recognize_face(embedding, known_faces, threshold=similarity_threshold):
                 best_similarity = similarity
                 best_label = label if similarity > threshold else None
     if best_label and best_similarity < high_similarity_threshold:
-        # If the similarity is lower than high_similarity_threshold, the person is not recognised as the same person.
-        #print(f"Similarity {best_similarity:.2f} for label {best_label} is below high threshold, treating as unknown.")
-        return None, 0
+        return best_label, best_similarity  # Returns recognition results even if the similarity is low
     return best_label, best_similarity
 
 # Check if face is a duplicate
@@ -155,13 +154,21 @@ def track_face(embedding, tracked_faces, current_box, threshold=similarity_thres
 # Predict emotion
 def predict_emotion(face_img):
     try:
-        gray_face = cv2.cvtColor(face_img, cv2.COLOR_BGR2GRAY)
-        processed_face = preprocess_image(gray_face)
-        predictions = emotion_model.predict(processed_face, verbose=0)
+        # 改進圖像預處理，確保輸入是三通道的
+        face_img = cv2.resize(face_img, (48, 48))
+        face_img = cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB)  # 使用 RGB 而不是灰度
+        face_img = face_img.astype('float32') / 255.0
+        face_img = np.expand_dims(face_img, axis=0)
+        
+        predictions = emotion_model.predict(face_img, verbose=0)
         emotion_index = np.argmax(predictions)
         emotion_label = emotion_labels[emotion_index]
         confidence = np.max(predictions)
-        return f"{emotion_label}: {confidence:.2f}"
+        
+        # Adjustment of confidence threshold
+        if confidence > 0.5:
+            return f"{emotion_label}: {confidence:.2f}"
+        return "Neutral"
     except Exception as e:
         print(f"Emotion prediction error: {e}")
         return "Unknown"
@@ -195,6 +202,7 @@ def main():
     face_id_counter = 0
     frame_count = 0
     last_frontal_result = {}
+    tracked_people = set()  # 用於追蹤已顯示的人
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -219,7 +227,8 @@ def main():
                 emotion_label = predict_emotion(face_img)
                 recognized_label, similarity = recognize_face(embedding, known_faces)
 
-                if recognized_label:
+                if recognized_label and recognized_label not in tracked_people:
+                    tracked_people.add(recognized_label)  # 添加到已顯示的人中
                     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                     cv2.putText(frame, recognized_label, (x1, y1-25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
                     cv2.putText(frame, emotion_label, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
@@ -280,6 +289,8 @@ def main():
 
         tracked_faces = {k: v for k, v in tracked_faces.items() if k in current_faces}
         seen_faces = {k: v for k, v in seen_faces.items() if time.time() - v['timestamp'] < 10}
+
+        tracked_people.clear()  # 清除已顯示的人以便下一幀使用
 
         cv2.imshow(window_name, frame)
         if cv2.waitKey(1) & 0xFF == 27:
