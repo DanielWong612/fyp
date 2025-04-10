@@ -9,8 +9,8 @@ from datetime import datetime
 import time
 
 # 設置參數
-model_path = "Test/Yolo/yolov8n-face.pt"  # YOLO 人臉檢測模型路徑
-capture_dir = "Test/face_database"        # 儲存人臉的根目錄
+model_path = "recognitionDemo/Yolo/yolov8n-face.pt"  # YOLO 人臉檢測模型路徑
+capture_dir = "recognitionDemo/face_database"        # 儲存人臉的根目錄
 delay_frames = 5                          # 延遲捕獲的幀數（新用戶）
 similarity_threshold = 0.6                # 識別閾值
 high_similarity_threshold = 0.8           # 高相似度閾值，用於自動捕獲新特徵
