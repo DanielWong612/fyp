@@ -64,7 +64,7 @@
         </div>
 
         <!-- Right Sidebar -->
-        <div class="w-full lg:w-96 bg-gray-800 p-6 overflow-y-auto border-t lg:border-t-0 lg:border-l border-gray-700">
+        <div class="w-full lg:w-[440px] bg-gray-800 p-6 overflow-y-auto border-t lg:border-t-0 lg:border-l border-gray-700">
             <!-- Action Buttons -->
             <div class="space-y-4 mb-6">
                 <button id="capture-faces-btn" onclick="captureFace()"
@@ -102,8 +102,11 @@
                             <div class="text-sm text-gray-400">Dept: {{ student.dept }}</div>
                         </div>
                         {% if student.avatar == 'default_avatar.png' %}
-                        <button onclick="openUploadModal('{{ student.sid }}'); event.stopPropagation();"
+                        <button onclick="openUploadModal('{{ student.sid }}', false); event.stopPropagation();"
                             class="bg-yellow-500 text-white py-1 px-3 rounded-lg hover:bg-yellow-600 transition duration-200">Upload Photo</button>
+                        {% else %}
+                        <button onclick="openUploadModal('{{ student.sid }}', true); event.stopPropagation();"
+                            class="bg-orange-500 text-white py-1 px-3 rounded-lg hover:bg-orange-600 transition duration-200">Replace Photo</button>
                         {% endif %}
                     </li>
                     {% endfor %}
@@ -137,9 +140,10 @@
     <!-- Upload Photo Modal -->
     <div id="upload-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
         <div class="bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-md">
-            <h3 class="text-lg font-semibold text-gray-300 mb-4">Upload Photo for Student</h3>
+            <h3 id="upload-modal-title" class="text-lg font-semibold text-gray-300 mb-4">Upload Photo for Student</h3>
             <form id="upload-form" enctype="multipart/form-data">
                 <input type="hidden" id="upload-student-sid" name="student_sid">
+                <input type="hidden" id="is-replace" name="is_replace">
                 <div class="mb-4">
                     <label for="photo" class="block text-sm font-medium text-gray-400 mb-2">Select Photo:</label>
                     <input type="file" id="photo" name="photo" accept="image/*"
@@ -205,8 +209,10 @@
             }
         }
 
-        function openUploadModal(sid) {
+        function openUploadModal(sid, isReplace) {
             document.getElementById('upload-student-sid').value = sid;
+            document.getElementById('is-replace').value = isReplace ? 'true' : 'false';
+            document.getElementById('upload-modal-title').textContent = isReplace ? 'Replace Photo for Student' : 'Upload Photo for Student';
             document.getElementById('upload-modal').classList.remove('hidden');
         }
 

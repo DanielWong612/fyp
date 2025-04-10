@@ -210,6 +210,8 @@ def upload_photo():
     if not student_sid:
         return jsonify({'success': False, 'error': 'No student SID provided'}), 400
 
+    is_replace = request.form.get('is_replace') == 'true'
+
     photo = request.files['photo']
     if photo.filename == '':
         return jsonify({'success': False, 'error': 'No file selected'}), 400
@@ -233,7 +235,6 @@ def upload_photo():
     for backend in backends:
         try:
             print(f"Trying face detection with backend: {backend}")
-            # Use DeepFace to detect a face
             DeepFace.represent(temp_filepath, model_name='Facenet', detector_backend=backend, enforce_detection=True)
             face_detected = True
             print(f"Face detected with backend: {backend}")
@@ -242,16 +243,56 @@ def upload_photo():
             print(f"Face detection failed with backend {backend}: {str(e)}")
             continue
 
+    # If DeepFace fails, try OpenCV Haar Cascade as a fallback
     if not face_detected:
-        # If no face is detected with any backend, delete the temporary file and return an error
-        os.remove(temp_filepath)
-        return jsonify({'success': False, 'error': 'No face detected in the uploaded photo. Tried all backends.'}), 400
+        print("Falling back to OpenCV Haar Cascade for face detection")
+        try:
+            face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+            img = cv2.imread(temp_filepath)
+            if img is None:
+                raise Exception("Failed to read the image")
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+            if len(faces) > 0:
+                face_detected = True
+                print(f"Face detected with OpenCV Haar Cascade: {len(faces)} faces found")
+            else:
+                print("No faces detected with OpenCV Haar Cascade")
+        except Exception as e:
+            print(f"OpenCV face detection failed: {str(e)}")
 
-    # If a face is detected, proceed to save the photo to the student's directory
+    if not face_detected:
+        os.remove(temp_filepath)
+        return jsonify({'success': False, 'error': 'No face detected in the uploaded photo. Tried all methods.'}), 400
+
+    # If replacing, find and move the old photo
+    if is_replace:
+        student_dir = os.path.join(FACE_DB_PATH, student_sid)
+        old_photo = None
+        if os.path.exists(student_dir):
+            for filename in os.listdir(student_dir):
+                if filename.lower().endswith(('.jpg', '.jpeg', '.png')):
+                    old_photo = filename
+                    break
+        
+        if old_photo:
+            old_photo_path = os.path.join(student_dir, old_photo)
+            new_photo_path = os.path.join(FACE_DB_PATH, old_photo)
+            # Move the old photo to static/face_database
+            shutil.move(old_photo_path, new_photo_path)
+            print(f"Moved old photo to: {new_photo_path}")
+            # Update face_pairings.json to remove the old pairing
+            pairings = load_pairings()
+            if old_photo in pairings:
+                del pairings[old_photo]
+                with open(PAIRINGS_FILE, 'w', encoding='utf-8') as f:
+                    json.dump(pairings, f, indent=2)
+
+    # Save the new photo to the student's directory
     student_dir = os.path.join(FACE_DB_PATH, student_sid)
     os.makedirs(student_dir, exist_ok=True)
     
-    # Generate a unique filename
+    # Generate a unique filename for the new photo
     filename = f"{student_sid}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
     filepath = os.path.join(student_dir, filename)
     

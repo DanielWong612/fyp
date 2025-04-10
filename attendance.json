@@ -2,7 +2,10 @@
     {
         "timestamp": "2025-04-11T00:29:56.123456",
         "recognized_students": [
-            {"sid": "23035686D", "name": "Daniel Wong"}
+            {
+                "sid": "23035686D",
+                "name": "Daniel Wong"
+            }
         ],
         "total_students": 6,
         "present_count": 1
@@ -10,10 +13,27 @@
     {
         "timestamp": "2025-04-11T00:31:10.654321",
         "recognized_students": [
-            {"sid": "22067588D", "name": "Alice"},
-            {"sid": "23035686D", "name": "Daniel Wong"}
+            {
+                "sid": "22067588D",
+                "name": "Alice"
+            },
+            {
+                "sid": "23035686D",
+                "name": "Daniel Wong"
+            }
         ],
         "total_students": 6,
         "present_count": 2
+    },
+    {
+        "timestamp": "2025-04-11T02:31:28.121355",
+        "recognized_students": [
+            {
+                "sid": "23035686D",
+                "name": "Daniel Wong"
+            }
+        ],
+        "total_students": 6,
+        "present_count": 1
     }
 ]
