@@ -27,6 +27,7 @@ FACE_DB_PATH = 'static/face_database'
 DEFAULT_AVATAR = 'default_avatar.png'
 ATTENDANCE_FILE = 'attendance.json'
 similarity_threshold = 0.6
+
 def load_students():
     with open(STUDENTS_FILE, 'r', encoding='utf-8') as f:
         return json.load(f)
@@ -120,7 +121,8 @@ def manual_capture_route():
 
 @app.route('/processed_video_feed')
 def processed_video_feed():
-    return Response(generate_processed_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    mode = request.args.get('mode', 'face_emotion')  # Default to face + emotion recognition
+    return Response(generate_processed_frames(mode=mode), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/capture_face', methods=['POST'])
 def capture_face():
@@ -172,7 +174,7 @@ def start_attendance():
     
     new_record = {
         'timestamp': datetime.now().isoformat(),
-        'recognized_students': recognized_students_with_names,  # Store both SID and name
+        'recognized_students': recognized_students_with_names,
         'total_students': len(load_students()),
         'present_count': len(recognized_students)
     }
@@ -185,7 +187,7 @@ def start_attendance():
         'success': True, 
         'interval': interval,
         'recognized_count': len(recognized_students),
-        'recognized_students': recognized_students  # Note: This only returns SIDs
+        'recognized_students': recognized_students
     })
 
 @app.route('/attendance')

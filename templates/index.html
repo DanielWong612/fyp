@@ -23,6 +23,7 @@
             resize: both;
             overflow: hidden;
             border: 4px solid #374151;
+            border-radius: 8px;
         }
 
         #resizable-camera-wrapper img {
@@ -34,74 +35,89 @@
 </head>
 
 <body class="bg-gray-900 text-white font-sans">
-    <div class="flex flex-col lg:flex-row">
-        <!-- Camera section -->
+    <div class="flex flex-col lg:flex-row min-h-screen">
+        <!-- Camera Section -->
         <div class="flex-1 p-6 bg-black">
-            <div class="flex justify-between items-center mb-3">
-                <h2 class="text-xl text-purple-300 font-bold flex items-center gap-2">
-                    Classroom Monitor System
-                </h2>
+            <div class="mb-4">
+                <h2 class="text-2xl text-purple-300 font-bold mb-4">Classroom Monitor System</h2>
+                <!-- Recognition Mode Selection -->
+                <div class="flex flex-wrap gap-3">
+                    <button onclick="setRecognitionMode('face_emotion')"
+                        class="bg-indigo-600 text-white py-2 px-4 rounded-lg shadow-md hover:bg-indigo-700 transition duration-200">Face
+                        + Emotion Recognition</button>
+                    <button onclick="setRecognitionMode('face')"
+                        class="bg-indigo-600 text-white py-2 px-4 rounded-lg shadow-md hover:bg-indigo-700 transition duration-200">Face
+                        Recognition Only</button>
+                    <button onclick="setRecognitionMode('emotion')"
+                        class="bg-indigo-600 text-white py-2 px-4 rounded-lg shadow-md hover:bg-indigo-700 transition duration-200">Emotion
+                        Recognition Only</button>
+                </div>
             </div>
             <div id="resizable-camera-wrapper" class="mx-auto">
                 <img src="{{ url_for('processed_video_feed') }}" alt="Processed video feed" id="video-feed">
             </div>
         </div>
 
-        <div class="w-full lg:w-80 bg-gray-800 p-4 overflow-y-auto border-t lg:border-t-0 lg:border-l border-gray-700">
-            <!-- Swapped positions: Capture All Detected Faces now comes first -->
-            <button onclick="captureFace()"
-                class="mb-4 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Capture All Detected
-                Faces</button>
+        <!-- Right Sidebar -->
+        <div class="w-full lg:w-80 bg-gray-800 p-6 overflow-y-auto border-t lg:border-t-0 lg:border-l border-gray-700">
+            <!-- Action Buttons -->
+            <div class="space-y-4 mb-6">
+                <button onclick="captureFace()"
+                    class="w-full bg-blue-600 text-white py-3 rounded-lg shadow-md hover:bg-blue-700 transition duration-200">Capture
+                    All Detected Faces</button>
+                <a href="{{ url_for('attendance_page') }}"
+                    class="w-full bg-purple-600 text-white py-3 rounded-lg shadow-md hover:bg-purple-700 block text-center transition duration-200">
+                    View Attendance History
+                </a>
+            </div>
 
-            <!-- Swapped positions: View Attendance History now comes second -->
-            <a href="{{ url_for('attendance_page') }}"
-                class="mb-4 w-full bg-purple-600 text-white py-2 px-4 rounded hover:bg-purple-700 block text-center">
-                View Attendance History
-            </a>
-
-            <!-- Card View for Roll Call -->
+            <!-- Roll Call Section -->
             <div class="bg-gray-700 p-4 rounded-lg shadow-md mb-6">
-                <label for="interval" class="block text-sm font-medium text-gray-300">Roll Call Interval
-                    (minutes):</label>
+                <h3 class="text-lg font-semibold text-gray-300 mb-3">Roll Call</h3>
+                <label for="interval" class="block text-sm font-medium text-gray-400 mb-2">Interval (minutes):</label>
                 <input type="number" id="interval" name="interval" min="1" value="5"
-                    class="mt-1 block w-full bg-gray-600 text-white border-gray-500 rounded-md shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50">
+                    class="w-full bg-gray-600 text-white border-gray-500 rounded-md shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50 p-2 mb-4">
                 <button onclick="startAttendance()"
-                    class="mt-4 w-full bg-green-600 text-white py-2 rounded hover:bg-green-700">Start
+                    class="w-full bg-green-600 text-white py-3 rounded-lg shadow-md hover:bg-green-700 transition duration-200">Start
                     Attendance</button>
             </div>
 
-            <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">Student List</h3>
-            <p class="text-sm text-gray-500">Max Recognizable People: {{ current_recognized_people }}/{{
-                max_recognizable_people }}</p>
-            <ul id="student-list" class="space-y-3">
-                {% for student in students %}
-                <li data-sid="{{ student.sid }}"
-                    class="bg-gray-700 p-3 rounded-lg flex gap-3 items-center shadow hover:bg-gray-600 transition cursor-pointer"
-                    onclick="selectStudent('{{ student.sid }}')">
-                    <img src="{{ url_for('static', filename=student.avatar) }}"
-                        class="w-12 h-12 object-cover border-2 border-white" alt="Student avatar">
-                    <div>
-                        <div class="font-bold text-lg">{{ student.name }}</div>
-                        <div class="text-sm text-gray-300">ID: {{ student.sid }}</div>
-                        <div class="text-sm text-gray-400">Dept: {{ student.dept }}</div>
-                    </div>
-                </li>
-                {% endfor %}
-            </ul>
+            <!-- Student List -->
+            <div>
+                <h3 class="text-xl font-semibold mb-4">Student List</h3>
+                <p class="text-sm text-gray-500 mb-4">Max Recognizable People: {{ current_recognized_people }}/{{
+                    max_recognizable_people }}</p>
+                <ul id="student-list" class="space-y-4">
+                    {% for student in students %}
+                    <li data-sid="{{ student.sid }}"
+                        class="bg-gray-700 p-4 rounded-lg flex gap-4 items-center shadow hover:bg-gray-600 transition cursor-pointer">
+                        <img src="{{ url_for('static', filename=student.avatar) }}"
+                            class="w-12 h-12 object-cover rounded-full border-2 border-white" alt="Student avatar">
+                        <div>
+                            <div class="font-bold text-lg">{{ student.name }}</div>
+                            <div class="text-sm text-gray-300">ID: {{ student.sid }}</div>
+                            <div class="text-sm text-gray-400">Dept: {{ student.dept }}</div>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
         </div>
     </div>
 
+    <!-- AI Detected Faces Section -->
     <div class="p-6 bg-gray-100 text-gray-900">
-        <h3 class="text-xl font-bold mb-4 flex items-center gap-2">AI Detected Faces (To Pair)</h3>
+        <h3 class="text-xl font-bold mb-4">AI Detected Faces (To Pair)</h3>
         <div id="face-list" class="flex flex-wrap gap-6">
             {% if unpaired_faces %}
             {% for face in unpaired_faces %}
             <div id="face-card-{{ face.label }}"
                 class="bg-white text-black rounded-lg shadow-md p-4 w-52 text-center hover:shadow-lg transition cursor-pointer">
-                <img src="/{{ face.filepath }}" class="w-24 h-24 mx-auto object-cover border-4 border-purple-400 mb-2"
+                <img src="/{{ face.filepath }}"
+                    class="w-24 h-24 mx-auto object-cover rounded-full border-4 border-purple-400 mb-2"
                     alt="Detected face">
                 <button onclick="pairFace('{{ face.label }}')"
-                    class="mt-2 w-full bg-purple-600 text-white py-1 rounded hover:bg-purple-700">
+                    class="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition duration-200">
                     Pair
                 </button>
             </div>
@@ -114,6 +130,20 @@
 
     <script>
         let selectedStudent = null;
+        let recognitionMode = 'face_emotion'; // Default mode
+
+        function setRecognitionMode(mode) {
+            recognitionMode = mode;
+            // Refresh the video feed to apply the new mode
+            document.getElementById('video-feed').src = "{{ url_for('processed_video_feed') }}?mode=" + mode;
+            // Update button styles to indicate the active mode
+            document.querySelectorAll('.bg-indigo-600').forEach(btn => {
+                btn.classList.remove('bg-indigo-500');
+                btn.classList.add('bg-indigo-600');
+            });
+            document.querySelector(`button[onclick="setRecognitionMode('${mode}')"]`).classList.remove('bg-indigo-600');
+            document.querySelector(`button[onclick="setRecognitionMode('${mode}')"]`).classList.add('bg-indigo-500');
+        }
 
         function selectStudent(sid) {
             selectedStudent = sid;
@@ -139,7 +169,7 @@
                         studentItem.querySelector('img').src = `{{ url_for('static', filename='thumbnails/') }}${face}`;
                         selectedStudent = null;
                         document.querySelectorAll('#student-list li').forEach(li => li.classList.remove('bg-purple-600'));
-                        document.getElementById('video-feed').src = "{{ url_for('processed_video_feed') }}";
+                        document.getElementById('video-feed').src = "{{ url_for('processed_video_feed') }}?mode=" + recognitionMode;
                     }
                 })
                 .catch(error => {
@@ -158,7 +188,7 @@
                 .then(response => {
                     if (response.ok) {
                         console.log(`Manual capture triggered for student ${sid}`);
-                        document.getElementById('video-feed').src = "{{ url_for('processed_video_feed') }}";
+                        document.getElementById('video-feed').src = "{{ url_for('processed_video_feed') }}?mode=" + recognitionMode;
                     } else {
                         throw new Error('Manual capture failed');
                     }
@@ -200,8 +230,8 @@
                         data.unpaired_faces.forEach(face => {
                             const faceCard = `
                     <div id="face-card-${face.label}" class="bg-white text-black rounded-lg shadow-md p-4 w-52 text-center hover:shadow-lg transition cursor-pointer">
-                        <img src="/${face.filepath}" class="w-24 h-24 mx-auto object-cover border-4 border-purple-400 mb-2" alt="Detected face">
-                        <button onclick="pairFace('${face.label}')" class="mt-2 w-full bg-purple-600 text-white py-1 rounded hover:bg-purple-700">
+                        <img src="/${face.filepath}" class="w-24 h-24 mx-auto object-cover rounded-full border-4 border-purple-400 mb-2" alt="Detected face">
+                        <button onclick="pairFace('${face.label}')" class="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition duration-200">
                             Pair
                         </button>
                     </div>`;
@@ -223,9 +253,7 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        // Map the recognized students to a string with names and SIDs for the alert
                         const studentList = data.recognized_students.map(sid => {
-                            // Fetch name from the DOM or use a separate endpoint if needed
                             const studentItem = document.querySelector(`#student-list li[data-sid="${sid}"]`);
                             const studentName = studentItem ? studentItem.querySelector('.font-bold').textContent : 'Unknown';
                             return `${studentName} (${sid})`;

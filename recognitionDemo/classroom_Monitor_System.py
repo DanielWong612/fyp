@@ -16,7 +16,6 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 # Set parameters
 yolo_model_path = "recognitionDemo/Yolo/yolov8n-face.pt"
 emotion_model_path = "recognitionDemo/FER/model.h5"
-# capture_dir = "recognitionDemo/face_database"
 capture_dir = "static/face_database"
 delay_frames = 5
 similarity_threshold = 0.6
@@ -41,20 +40,19 @@ last_capture_time = {}
 detected_faces = []
 
 # Load student data
-# In classroom_Monitor_System.py
 def load_students():
     try:
         with open('students.json', 'r', encoding='utf-8') as f:
             students = json.load(f)
         sid_to_name = {student['sid']: student['name'] for student in students}
-        print("Loaded sid_to_name:", sid_to_name)  # Add this for debugging
+        print("Loaded sid_to_name:", sid_to_name)
         return students, sid_to_name
     except FileNotFoundError:
         print("students.json not found.")
         return [], {}
 
 students, sid_to_name = load_students()
-max_recognizable_people = len(students)  # 設定可辨認的人數上限
+max_recognizable_people = len(students)
 print(f"Number of students loaded: {len(students)}")
 
 # Load known face features from directory
@@ -95,16 +93,14 @@ def is_frontal_face(face_img):
 
 # Save face image
 def auto_capture(face_img, label, capture_dir):
-    # Check if similar faces already exist
     try:
         embedding = DeepFace.represent(
             face_img,
             model_name='Facenet',
             enforce_detection=False
         )[0]["embedding"]
-        existing_label = get_new_label(embedding, known_faces)  # Check if similar labels already exist
+        existing_label = get_new_label(embedding, known_faces)
         if existing_label != label:
-            #print(f"Using existing label {existing_label} instead of {label}")
             label = existing_label
     except Exception as e:
         print(f"Feature extraction error during auto_capture: {e}")
@@ -112,7 +108,7 @@ def auto_capture(face_img, label, capture_dir):
     base_filename = f"{label}.jpg"
     filepath = os.path.join(capture_dir, base_filename)
     counter = 1
-    while os.path.exists(filepath):  # If the file already exists, increment the number
+    while os.path.exists(filepath):
         new_filename = f"{label}_{counter}.jpg"
         filepath = os.path.join(capture_dir, new_filename)
         counter += 1
@@ -130,7 +126,7 @@ def recognize_face(embedding, known_faces, threshold=similarity_threshold):
                 best_similarity = similarity
                 best_label = label if similarity > threshold else None
     if best_label and best_similarity < high_similarity_threshold:
-        return best_label, best_similarity  # Returns recognition results even if the similarity is low
+        return best_label, best_similarity
     return best_label, best_similarity
 
 # Check if face is a duplicate
@@ -156,9 +152,8 @@ def track_face(embedding, tracked_faces, current_box, threshold=similarity_thres
 # Predict emotion
 def predict_emotion(face_img):
     try:
-        # 改進圖像預處理，確保輸入是三通道的
         face_img = cv2.resize(face_img, (48, 48))
-        face_img = cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB)  # 使用 RGB 而不是灰度
+        face_img = cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB)
         face_img = face_img.astype('float32') / 255.0
         face_img = np.expand_dims(face_img, axis=0)
         
@@ -167,7 +162,6 @@ def predict_emotion(face_img):
         emotion_label = emotion_labels[emotion_index]
         confidence = np.max(predictions)
         
-        # Adjustment of confidence threshold
         if confidence > 0.5:
             return f"{emotion_label}: {confidence:.2f}"
         return "Neutral"
@@ -180,12 +174,9 @@ def get_new_label(embedding, known_faces):
     for label, embeddings in known_faces.items():
         for known_embedding in embeddings:
             similarity = cosine_similarity([embedding], [known_embedding])[0][0]
-            if similarity > high_similarity_threshold:  # If the similarity is higher than 0.8, reuse the existing labels.
-                #print(f"Reusing label {label} for similar face (similarity: {similarity:.2f})")
+            if similarity > high_similarity_threshold:
                 return label
-    # If no similar face is found, generate a new label.
     new_label = f"user_{len(known_faces) + 1}"
-    #print(f"Assigning new label: {new_label}")
     return new_label
 
 # Main function
@@ -204,7 +195,7 @@ def main():
     face_id_counter = 0
     frame_count = 0
     last_frontal_result = {}
-    tracked_people = set()  # 用於追蹤已顯示的人
+    tracked_people = set()
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -230,7 +221,7 @@ def main():
                 recognized_label, similarity = recognize_face(embedding, known_faces)
 
                 if recognized_label and recognized_label not in tracked_people:
-                    tracked_people.add(recognized_label)  # 添加到已顯示的人中
+                    tracked_people.add(recognized_label)
                     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                     cv2.putText(frame, recognized_label, (x1, y1-25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
                     cv2.putText(frame, emotion_label, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
@@ -292,7 +283,7 @@ def main():
         tracked_faces = {k: v for k, v in tracked_faces.items() if k in current_faces}
         seen_faces = {k: v for k, v in seen_faces.items() if time.time() - v['timestamp'] < 10}
 
-        tracked_people.clear()  # 清除已顯示的人以便下一幀使用
+        tracked_people.clear()
 
         cv2.imshow(window_name, frame)
         if cv2.waitKey(1) & 0xFF == 27:
@@ -306,15 +297,15 @@ def main():
 def capture_unique_unknown_faces(frame):
     """Capture unique unknown faces from a single frame and return them."""
     results = yolo_model.predict(source=frame, conf=0.25, imgsz=640, verbose=False)
-    unique_faces = {}  # Save face image, key is bounding box icon
-    face_embeddings = []  # Save the feature vectors of all faces in the current frame.
+    unique_faces = {}
+    face_embeddings = []
 
     for result in results:
         boxes = result.boxes.xyxy.cpu().numpy() if result.boxes.xyxy is not None else []
         for box in boxes:
             x1, y1, x2, y2 = map(int, box[:4])
             face_img = frame[y1:y2, x1:x2]
-            box_key = f"{x1}_{y1}_{x2}_{y2}"  # Uniquely identified by the bounding box coordinate.
+            box_key = f"{x1}_{y1}_{x2}_{y2}"
 
             try:
                 embedding = DeepFace.represent(
@@ -326,26 +317,22 @@ def capture_unique_unknown_faces(frame):
                 print(f"Feature extraction error: {e}")
                 continue
 
-            # Check if there is already a similar face in the current frame.
             is_duplicate = False
             for existing_embedding in face_embeddings:
                 similarity = cosine_similarity([embedding], [existing_embedding])[0][0]
-                if similarity > high_similarity_threshold:  #If the similarity is more than 0.8, it is regarded as the same person.
+                if similarity > high_similarity_threshold:
                     is_duplicate = True
-                    #print(f"Duplicate face detected in the same frame (similarity: {similarity:.2f})")
                     break
 
             if is_duplicate:
-                continue  # 跳過重複的人臉
+                continue
 
-            # 檢查是否為已知人臉
             recognized_label, similarity = recognize_face(embedding, known_faces)
-            if recognized_label is None:  # Unknown faces only
-                if box_key not in unique_faces:  # Avoid duplicates in the same frame
+            if recognized_label is None:
+                if box_key not in unique_faces:
                     unique_faces[box_key] = face_img
-                    face_embeddings.append(embedding)  # Record Feature Vector
+                    face_embeddings.append(embedding)
 
-    # Save unique unknown_faces and update known_faces
     captured_faces = []
     for i, (box_key, face_img) in enumerate(unique_faces.items()):
         embedding = DeepFace.represent(
@@ -353,11 +340,11 @@ def capture_unique_unknown_faces(frame):
             model_name='Facenet',
             enforce_detection=False
         )[0]["embedding"]
-        new_label = get_new_label(embedding, known_faces)  # Get the label and check if it already exists
-        filepath = auto_capture(face_img, new_label, capture_dir)  # Save to static/face_database
+        new_label = get_new_label(embedding, known_faces)
+        filepath = auto_capture(face_img, new_label, capture_dir)
         if new_label not in known_faces:
             known_faces[new_label] = []
-        known_faces[new_label].append(embedding)  # 更新 known_faces
+        known_faces[new_label].append(embedding)
         captured_faces.append({'label': new_label, 'filepath': filepath})
 
     return captured_faces
@@ -377,8 +364,7 @@ def capture_face_from_current_frame():
     
     return capture_unique_unknown_faces(frame)
 
-# In your recognitionDemo/classroom_Monitor_System.py
-def generate_processed_frames(selected_student=None, manual_capture_trigger=False):
+def generate_processed_frames(selected_student=None, manual_capture_trigger=False, mode='face_emotion'):
     load_known_faces(capture_dir)
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
@@ -393,7 +379,7 @@ def generate_processed_frames(selected_student=None, manual_capture_trigger=Fals
 
         results = yolo_model.predict(source=frame, conf=0.25, imgsz=640, verbose=False)
         frame_embeddings = []
-        recognized_sids = set()  # Track recognized students in this frame
+        recognized_sids = set()
 
         for result in results:
             boxes = result.boxes.xyxy.cpu().numpy() if result.boxes.xyxy is not None else []
@@ -402,36 +388,46 @@ def generate_processed_frames(selected_student=None, manual_capture_trigger=Fals
                 face_img = frame[y1:y2, x1:x2]
                 try:
                     embedding = DeepFace.represent(face_img, model_name='Facenet', enforce_detection=False)[0]["embedding"]
-                    
-                    # Check for duplicates in current frame
-                    is_duplicate = any(cosine_similarity([embedding], [e])[0][0] > high_similarity_threshold 
-                                    for e in frame_embeddings)
-                    
-                    if not is_duplicate:
-                        frame_embeddings.append(embedding)
-                        label, similarity = recognize_face(embedding, known_faces)
-                        
-                        if label and similarity >= similarity_threshold:
-                            recognized_sids.add(label)
-                            student_name = sid_to_name.get(label, "")
-                            display_label = f"{student_name} ({label})"
-                            color = (0, 255, 0)  # Green for recognized
-                        else:
-                            display_label = "Unknown"
-                            color = (255, 255, 0)  # Yellow for unknown
-                            
-                        emotion_label = predict_emotion(face_img)
-                        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-                        cv2.putText(frame, display_label, (x1, y1-25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-                        cv2.putText(frame, emotion_label, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
-                        
-                        if manual_capture_trigger and selected_student == label and is_frontal_face(face_img):
-                            auto_capture(face_img, label, capture_dir)
-                            manual_capture_trigger = False
-
                 except Exception as e:
                     print(f"Feature extraction error: {e}")
                     continue
+
+                # Check for duplicates in current frame
+                is_duplicate = any(cosine_similarity([embedding], [e])[0][0] > high_similarity_threshold 
+                                for e in frame_embeddings)
+                
+                if not is_duplicate:
+                    frame_embeddings.append(embedding)
+
+                    # Determine what to display based on the mode
+                    display_label = "Unknown"
+                    color = (255, 255, 0)  # Yellow for unknown by default
+                    emotion_label = ""
+
+                    try:
+                        if mode in ['face_emotion', 'face']:  # Face recognition
+                            label, similarity = recognize_face(embedding, known_faces)
+                            if label and similarity >= similarity_threshold:
+                                recognized_sids.add(label)
+                                student_name = sid_to_name.get(label, "")
+                                display_label = f"{student_name} ({label})"
+                                color = (0, 255, 0)  # Green for recognized
+
+                        if mode in ['face_emotion', 'emotion']:  # Emotion recognition
+                            emotion_label = predict_emotion(face_img)
+
+                        # Draw the bounding box and labels
+                        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+                        cv2.putText(frame, display_label, (x1, y1-25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                        if emotion_label:
+                            cv2.putText(frame, emotion_label, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+
+                        if manual_capture_trigger and selected_student == label and is_frontal_face(face_img):
+                            auto_capture(face_img, label, capture_dir)
+                            manual_capture_trigger = False
+                    except Exception as e:
+                        print(f"Feature extraction error: {e}")
+                        continue
 
         _, buffer = cv2.imencode('.jpg', frame)
         frame_bytes = buffer.tobytes()
