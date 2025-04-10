@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <title>Attendance History - Classroom Monitor System</title>
@@ -9,14 +8,12 @@
         ::-webkit-scrollbar {
             width: 6px;
         }
-
         ::-webkit-scrollbar-thumb {
             background-color: #4B5563;
             border-radius: 3px;
         }
     </style>
 </head>
-
 <body class="bg-gray-900 text-white font-sans">
     <div class="min-h-screen p-6">
         <div class="max-w-4xl mx-auto">
@@ -28,40 +25,55 @@
             </div>
 
             {% if attendance_history %}
-            <div class="space-y-6">
+                {% set grouped_by_date = {} %}
                 {% for record in attendance_history %}
-                <div class="bg-gray-800 p-4 rounded-lg shadow-md">
-                    <div class="flex justify-between items-center mb-2">
-                        <h2 class="text-lg font-semibold">{{ record.timestamp }}</h2>
-                        <span class="text-sm text-gray-400">
-                            {{ record.present_count }} / {{ record.total_students }} Present
-                        </span>
-                    </div>
-                    <div class="mt-2">
-                        <p class="text-sm text-gray-300">Recognized Students:</p>
-                        {% if record.recognized_students %}
-                        <ul class="list-disc list-inside mt-1 text-gray-200">
-                            {% for sid in record.recognized_students %}
-                            <li>{{ sid }}</li>
-                            {% endfor %}
-                        </ul>
-                        {% else %}
-                        <p class="text-sm text-gray-500">No students recognized</p>
-                        {% endif %}
-                    </div>
-                </div>
+                    {% set date = record.timestamp.split('T')[0] %}
+                    {% if date not in grouped_by_date %}
+                        {% set _ = grouped_by_date.update({date: []}) %}
+                    {% endif %}
+                    {% set _ = grouped_by_date[date].append(record) %}
                 {% endfor %}
-            </div>
+
+                {% for date, records in grouped_by_date.items() %}
+                    <div class="mb-8">
+                        <h2 class="text-xl font-semibold text-purple-400 mb-4">{{ date }}</h2>
+                        <div class="space-y-4">
+                            {% for record in records %}
+                                <div class="bg-gray-800 p-4 rounded-lg shadow-md">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <h3 class="text-lg font-semibold">
+                                            {{ record.timestamp.split('T')[1].split('.')[0] }}
+                                        </h3>
+                                        <span class="text-sm text-gray-400">
+                                            {{ record.present_count }} / {{ record.total_students }} Present
+                                        </span>
+                                    </div>
+                                    <div class="mt-2">
+                                        <p class="text-sm text-gray-300">Recognized Students:</p>
+                                        {% if record.recognized_students %}
+                                            <ul class="list-disc list-inside mt-1 text-gray-200">
+                                                {% for student in record.recognized_students %}
+                                                    <li>{{ student.name }} ({{ student.sid }})</li>
+                                                {% endfor %}
+                                            </ul>
+                                        {% else %}
+                                            <p class="text-sm text-gray-500">No students recognized</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endfor %}
             {% else %}
-            <div class="bg-gray-800 p-4 rounded-lg shadow-md text-center">
-                <p class="text-gray-400">No attendance records found.</p>
-            </div>
+                <div class="bg-gray-800 p-4 rounded-lg shadow-md text-center">
+                    <p class="text-gray-400">No attendance records found.</p>
+                </div>
             {% endif %}
         </div>
     </div>
 
     <script>
-        // Optional: Add real-time refresh if desired
         function refreshAttendance() {
             fetch("{{ url_for('get_attendance_history') }}")
                 .then(response => response.json())
@@ -71,10 +83,9 @@
                     }
                 });
         }
-
+        
         // Uncomment to enable auto-refresh every 30 seconds
         // setInterval(refreshAttendance, 30000);
     </script>
 </body>
-
 </html>

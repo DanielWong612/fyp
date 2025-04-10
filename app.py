@@ -18,13 +18,15 @@ from deepface import DeepFace
 
 app = Flask(__name__)
 
+# Enable the 'do' extension for Jinja2
+app.jinja_env.add_extension('jinja2.ext.do')
+
 STUDENTS_FILE = 'students.json'
 PAIRINGS_FILE = 'face_pairings.json'
 FACE_DB_PATH = 'static/face_database'
 DEFAULT_AVATAR = 'default_avatar.png'
 ATTENDANCE_FILE = 'attendance.json'
 similarity_threshold = 0.6
-
 def load_students():
     with open(STUDENTS_FILE, 'r', encoding='utf-8') as f:
         return json.load(f)
@@ -162,9 +164,15 @@ def start_attendance():
     
     recognized_students = detect_students_in_frame(frame)
     
+    # Map student IDs to names
+    recognized_students_with_names = [
+        {'sid': sid, 'name': sid_to_name.get(sid, 'Unknown')}
+        for sid in recognized_students
+    ]
+    
     new_record = {
         'timestamp': datetime.now().isoformat(),
-        'recognized_students': recognized_students,
+        'recognized_students': recognized_students_with_names,  # Store both SID and name
         'total_students': len(load_students()),
         'present_count': len(recognized_students)
     }
@@ -177,7 +185,7 @@ def start_attendance():
         'success': True, 
         'interval': interval,
         'recognized_count': len(recognized_students),
-        'recognized_students': recognized_students
+        'recognized_students': recognized_students  # Note: This only returns SIDs
     })
 
 @app.route('/attendance')
@@ -185,7 +193,6 @@ def attendance_page():
     attendance_history = load_attendance_history()
     return render_template('attendance.html', attendance_history=attendance_history)
 
-# Add the missing get_attendance_history route
 @app.route('/get_attendance_history', methods=['GET'])
 def get_attendance_history():
     attendance_history = load_attendance_history()
@@ -212,11 +219,15 @@ def detect_students_in_frame(frame):
                 label, similarity = recognize_face(embedding, known_faces)
                 if label and similarity >= similarity_threshold and label in sid_to_name:
                     recognized_sids.add(label)
+                    print(f"Recognized student: {label} (similarity: {similarity})")
+                else:
+                    print(f"Face detected but not recognized (similarity: {similarity})")
                     
             except Exception as e:
                 print(f"Error processing face: {e}")
                 continue
     
+    print(f"Total recognized students: {len(recognized_sids)} - {recognized_sids}")
     return list(recognized_sids)
 
 def recognize_face(embedding, known_faces, threshold=similarity_threshold):

@@ -41,12 +41,13 @@ last_capture_time = {}
 detected_faces = []
 
 # Load student data
+# In classroom_Monitor_System.py
 def load_students():
     try:
         with open('students.json', 'r', encoding='utf-8') as f:
             students = json.load(f)
         sid_to_name = {student['sid']: student['name'] for student in students}
-        print("Loaded students:", students)
+        print("Loaded sid_to_name:", sid_to_name)  # Add this for debugging
         return students, sid_to_name
     except FileNotFoundError:
         print("students.json not found.")

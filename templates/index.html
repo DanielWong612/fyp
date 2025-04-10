@@ -50,24 +50,29 @@
         <div class="w-full lg:w-80 bg-gray-800 p-4 overflow-y-auto border-t lg:border-t-0 lg:border-l border-gray-700">
             <!-- Swapped positions: Capture All Detected Faces now comes first -->
             <button onclick="captureFace()"
-                class="mb-4 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Capture All Detected Faces</button>
+                class="mb-4 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Capture All Detected
+                Faces</button>
 
             <!-- Swapped positions: View Attendance History now comes second -->
-            <a href="{{ url_for('attendance_page') }}" class="mb-4 w-full bg-purple-600 text-white py-2 px-4 rounded hover:bg-purple-700 block text-center">
+            <a href="{{ url_for('attendance_page') }}"
+                class="mb-4 w-full bg-purple-600 text-white py-2 px-4 rounded hover:bg-purple-700 block text-center">
                 View Attendance History
             </a>
 
             <!-- Card View for Roll Call -->
             <div class="bg-gray-700 p-4 rounded-lg shadow-md mb-6">
-                <label for="interval" class="block text-sm font-medium text-gray-300">Roll Call Interval (minutes):</label>
+                <label for="interval" class="block text-sm font-medium text-gray-300">Roll Call Interval
+                    (minutes):</label>
                 <input type="number" id="interval" name="interval" min="1" value="5"
                     class="mt-1 block w-full bg-gray-600 text-white border-gray-500 rounded-md shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50">
                 <button onclick="startAttendance()"
-                    class="mt-4 w-full bg-green-600 text-white py-2 rounded hover:bg-green-700">Start Attendance</button>
+                    class="mt-4 w-full bg-green-600 text-white py-2 rounded hover:bg-green-700">Start
+                    Attendance</button>
             </div>
 
             <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">Student List</h3>
-            <p class="text-sm text-gray-500">Max Recognizable People: {{ current_recognized_people }}/{{ max_recognizable_people }}</p>
+            <p class="text-sm text-gray-500">Max Recognizable People: {{ current_recognized_people }}/{{
+                max_recognizable_people }}</p>
             <ul id="student-list" class="space-y-3">
                 {% for student in students %}
                 <li data-sid="{{ student.sid }}"
@@ -218,7 +223,15 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        alert(`Attendance recorded!\nInterval: ${data.interval} minutes\nStudents present: ${data.recognized_count}`);
+                        // Map the recognized students to a string with names and SIDs for the alert
+                        const studentList = data.recognized_students.map(sid => {
+                            // Fetch name from the DOM or use a separate endpoint if needed
+                            const studentItem = document.querySelector(`#student-list li[data-sid="${sid}"]`);
+                            const studentName = studentItem ? studentItem.querySelector('.font-bold').textContent : 'Unknown';
+                            return `${studentName} (${sid})`;
+                        }).join(', ');
+
+                        alert(`Attendance recorded!\nInterval: ${data.interval} minutes\nStudents present: ${data.recognized_count}\nRecognized: ${studentList}`);
                         document.querySelectorAll('#student-list li').forEach(li => {
                             const sid = li.dataset.sid;
                             if (data.recognized_students.includes(sid)) {
@@ -238,4 +251,5 @@
         }
     </script>
 </body>
+
 </html>
