@@ -12,6 +12,7 @@ from recognitionDemo.classroom_Monitor_System import (
     sid_to_name
 )
 import cv2
+import numpy as np
 from datetime import datetime
 from sklearn.metrics.pairwise import cosine_similarity
 from deepface import DeepFace
@@ -121,7 +122,7 @@ def manual_capture_route():
 
 @app.route('/processed_video_feed')
 def processed_video_feed():
-    mode = request.args.get('mode', 'face_emotion')  # Default to face + emotion recognition
+    mode = request.args.get('mode', 'face_emotion')
     return Response(generate_processed_frames(mode=mode), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/capture_face', methods=['POST'])
@@ -199,6 +200,68 @@ def attendance_page():
 def get_attendance_history():
     attendance_history = load_attendance_history()
     return jsonify({'success': True, 'history': attendance_history})
+
+@app.route('/upload_photo', methods=['POST'])
+def upload_photo():
+    if 'photo' not in request.files:
+        return jsonify({'success': False, 'error': 'No photo uploaded'}), 400
+    
+    student_sid = request.form.get('student_sid')
+    if not student_sid:
+        return jsonify({'success': False, 'error': 'No student SID provided'}), 400
+
+    photo = request.files['photo']
+    if photo.filename == '':
+        return jsonify({'success': False, 'error': 'No file selected'}), 400
+
+    if not photo.filename.lower().endswith(('.jpg', '.jpeg', '.png')):
+        return jsonify({'success': False, 'error': 'Invalid file format. Only JPG, JPEG, and PNG are allowed'}), 400
+
+    # Save the uploaded photo temporarily to check for faces
+    temp_filename = f"temp_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+    temp_filepath = os.path.join(FACE_DB_PATH, temp_filename)
+    photo.save(temp_filepath)
+
+    # Log the file path and check if the file exists
+    print(f"Temporary file saved at: {temp_filepath}")
+    if not os.path.exists(temp_filepath):
+        return jsonify({'success': False, 'error': 'Failed to save the uploaded file'}), 500
+
+    # Check if the image contains a detectable face using different backends
+    backends = ['opencv', 'ssd', 'dlib', 'mtcnn', 'retinaface']
+    face_detected = False
+    for backend in backends:
+        try:
+            print(f"Trying face detection with backend: {backend}")
+            # Use DeepFace to detect a face
+            DeepFace.represent(temp_filepath, model_name='Facenet', detector_backend=backend, enforce_detection=True)
+            face_detected = True
+            print(f"Face detected with backend: {backend}")
+            break
+        except Exception as e:
+            print(f"Face detection failed with backend {backend}: {str(e)}")
+            continue
+
+    if not face_detected:
+        # If no face is detected with any backend, delete the temporary file and return an error
+        os.remove(temp_filepath)
+        return jsonify({'success': False, 'error': 'No face detected in the uploaded photo. Tried all backends.'}), 400
+
+    # If a face is detected, proceed to save the photo to the student's directory
+    student_dir = os.path.join(FACE_DB_PATH, student_sid)
+    os.makedirs(student_dir, exist_ok=True)
+    
+    # Generate a unique filename
+    filename = f"{student_sid}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+    filepath = os.path.join(student_dir, filename)
+    
+    # Move the temporary file to the student's directory
+    shutil.move(temp_filepath, filepath)
+
+    # Update the face pairings
+    save_pairing(filename, student_sid)
+
+    return jsonify({'success': True})
 
 def detect_students_in_frame(frame):
     """Detect and recognize students in a single frame"""

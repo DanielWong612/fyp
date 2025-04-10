@@ -64,7 +64,7 @@
         </div>
 
         <!-- Right Sidebar -->
-        <div class="w-full lg:w-80 bg-gray-800 p-6 overflow-y-auto border-t lg:border-t-0 lg:border-l border-gray-700">
+        <div class="w-full lg:w-96 bg-gray-800 p-6 overflow-y-auto border-t lg:border-t-0 lg:border-l border-gray-700">
             <!-- Action Buttons -->
             <div class="space-y-4 mb-6">
                 <button id="capture-faces-btn" onclick="captureFace()"
@@ -75,9 +75,9 @@
                 </a>
             </div>
 
-            <!-- Attendance Section -->
+            <!-- Roll Call Section -->
             <div class="bg-gray-700 p-4 rounded-lg shadow-md mb-6">
-                <h3 class="text-lg font-semibold text-gray-300 mb-3">Attendance</h3>
+                <h3 class="text-lg font-semibold text-gray-300 mb-3">Roll Call</h3>
                 <label for="interval" class="block text-sm font-medium text-gray-400 mb-2">Interval (minutes):</label>
                 <input type="number" id="interval" name="interval" min="1" value="5"
                     class="w-full bg-gray-600 text-white border-gray-500 rounded-md shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50 p-2 mb-4">
@@ -92,14 +92,19 @@
                 <ul id="student-list" class="space-y-4">
                     {% for student in students %}
                     <li data-sid="{{ student.sid }}"
-                        class="bg-gray-700 p-4 rounded-lg flex gap-4 items-center shadow hover:bg-gray-600 transition cursor-pointer">
+                        class="bg-gray-700 p-4 rounded-lg flex gap-4 items-center shadow hover:bg-gray-600 transition cursor-pointer"
+                        onclick="selectStudent('{{ student.sid }}')">
                         <img src="{{ url_for('static', filename=student.avatar) }}"
                             class="w-12 h-12 object-cover rounded-full border-2 border-white" alt="Student avatar">
-                        <div>
+                        <div class="flex-1">
                             <div class="font-bold text-lg">{{ student.name }}</div>
                             <div class="text-sm text-gray-300">ID: {{ student.sid }}</div>
                             <div class="text-sm text-gray-400">Dept: {{ student.dept }}</div>
                         </div>
+                        {% if student.avatar == 'default_avatar.png' %}
+                        <button onclick="openUploadModal('{{ student.sid }}'); event.stopPropagation();"
+                            class="bg-yellow-500 text-white py-1 px-3 rounded-lg hover:bg-yellow-600 transition duration-200">Upload Photo</button>
+                        {% endif %}
                     </li>
                     {% endfor %}
                 </ul>
@@ -126,6 +131,27 @@
             {% else %}
             <p class="text-gray-500">No unpaired faces detected.</p>
             {% endif %}
+        </div>
+    </div>
+
+    <!-- Upload Photo Modal -->
+    <div id="upload-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+        <div class="bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-md">
+            <h3 class="text-lg font-semibold text-gray-300 mb-4">Upload Photo for Student</h3>
+            <form id="upload-form" enctype="multipart/form-data">
+                <input type="hidden" id="upload-student-sid" name="student_sid">
+                <div class="mb-4">
+                    <label for="photo" class="block text-sm font-medium text-gray-400 mb-2">Select Photo:</label>
+                    <input type="file" id="photo" name="photo" accept="image/*"
+                        class="w-full bg-gray-600 text-white border-gray-500 rounded-md p-2">
+                </div>
+                <div class="flex justify-end gap-3">
+                    <button type="button" onclick="closeUploadModal()"
+                        class="bg-gray-500 text-white py-2 px-4 rounded-lg hover:bg-gray-600 transition duration-200">Cancel</button>
+                    <button type="submit"
+                        class="bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700 transition duration-200">Upload</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -179,10 +205,48 @@
             }
         }
 
+        function openUploadModal(sid) {
+            document.getElementById('upload-student-sid').value = sid;
+            document.getElementById('upload-modal').classList.remove('hidden');
+        }
+
+        function closeUploadModal() {
+            document.getElementById('upload-modal').classList.add('hidden');
+            document.getElementById('upload-form').reset();
+        }
+
+        document.getElementById('upload-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            fetch("{{ url_for('upload_photo') }}", {
+                method: "POST",
+                body: formData
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Photo uploaded successfully!');
+                        closeUploadModal();
+                        // Refresh the page to update the student list
+                        location.reload();
+                    } else {
+                        alert(data.error || 'Upload failed. Please try again.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error during upload:', error);
+                    alert('An error occurred while uploading. Please try again.');
+                });
+        });
+
         function selectStudent(sid) {
             selectedStudent = sid;
+            console.log('Selected student:', selectedStudent); // Debug log
             document.querySelectorAll('#student-list li').forEach(li => li.classList.remove('bg-purple-600'));
-            document.querySelector(`#student-list li[data-sid="${sid}"]`).classList.add('bg-purple-600');
+            const selectedLi = document.querySelector(`#student-list li[data-sid="${sid}"]`);
+            if (selectedLi) {
+                selectedLi.classList.add('bg-purple-600');
+            }
         }
 
         function pairFace(face) {
@@ -248,6 +312,9 @@
                     if (data.success) {
                         alert(`Captured ${data.captured_faces} unique unknown faces!`);
                         fetchUnpairedFaces();
+                        // Clear the selected student after capturing faces
+                        selectedStudent = null;
+                        document.querySelectorAll('#student-list li').forEach(li => li.classList.remove('bg-purple-600'));
                     } else {
                         alert('Capture failed: ' + (data.error || 'Unknown error'));
                     }
