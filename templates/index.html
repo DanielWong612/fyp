@@ -31,6 +31,14 @@
             height: 100%;
             object-fit: contain;
         }
+
+        /* Style for disabled buttons */
+        button:disabled,
+        a.disabled {
+            background-color: #6b7280 !important; /* Grayed out */
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
     </style>
 </head>
 
@@ -42,15 +50,12 @@
                 <h2 class="text-2xl text-purple-300 font-bold mb-4">Classroom Monitor System</h2>
                 <!-- Recognition Mode Selection -->
                 <div class="flex flex-wrap gap-3">
-                    <button onclick="setRecognitionMode('face_emotion')"
-                        class="bg-indigo-600 text-white py-2 px-4 rounded-lg shadow-md hover:bg-indigo-700 transition duration-200">Face
-                        + Emotion Recognition</button>
-                    <button onclick="setRecognitionMode('face')"
-                        class="bg-indigo-600 text-white py-2 px-4 rounded-lg shadow-md hover:bg-indigo-700 transition duration-200">Face
-                        Recognition Only</button>
-                    <button onclick="setRecognitionMode('emotion')"
-                        class="bg-indigo-600 text-white py-2 px-4 rounded-lg shadow-md hover:bg-indigo-700 transition duration-200">Emotion
-                        Recognition Only</button>
+                    <button id="face-emotion-btn" onclick="setRecognitionMode('face_emotion')"
+                        class="bg-cyan-400 text-white py-2 px-4 rounded-lg shadow-md hover:bg-cyan-500 transition duration-200">Face + Emotion Recognition</button>
+                    <button id="face-only-btn" onclick="setRecognitionMode('face')"
+                        class="bg-indigo-600 text-white py-2 px-4 rounded-lg shadow-md hover:bg-indigo-700 transition duration-200">Face Recognition Only</button>
+                    <button id="emotion-only-btn" onclick="setRecognitionMode('emotion')"
+                        class="bg-indigo-600 text-white py-2 px-4 rounded-lg shadow-md hover:bg-indigo-700 transition duration-200">Emotion Recognition Only</button>
                 </div>
             </div>
             <div id="resizable-camera-wrapper" class="mx-auto">
@@ -62,31 +67,28 @@
         <div class="w-full lg:w-80 bg-gray-800 p-6 overflow-y-auto border-t lg:border-t-0 lg:border-l border-gray-700">
             <!-- Action Buttons -->
             <div class="space-y-4 mb-6">
-                <button onclick="captureFace()"
-                    class="w-full bg-blue-600 text-white py-3 rounded-lg shadow-md hover:bg-blue-700 transition duration-200">Capture
-                    All Detected Faces</button>
-                <a href="{{ url_for('attendance_page') }}"
+                <button id="capture-faces-btn" onclick="captureFace()"
+                    class="w-full bg-blue-600 text-white py-3 rounded-lg shadow-md hover:bg-blue-700 transition duration-200">Capture All Detected Faces</button>
+                <a id="view-attendance-btn" href="{{ url_for('attendance_page') }}"
                     class="w-full bg-purple-600 text-white py-3 rounded-lg shadow-md hover:bg-purple-700 block text-center transition duration-200">
                     View Attendance History
                 </a>
             </div>
 
-            <!-- Roll Call Section -->
+            <!-- Attendance Section -->
             <div class="bg-gray-700 p-4 rounded-lg shadow-md mb-6">
-                <h3 class="text-lg font-semibold text-gray-300 mb-3">Roll Call</h3>
+                <h3 class="text-lg font-semibold text-gray-300 mb-3">Attendance</h3>
                 <label for="interval" class="block text-sm font-medium text-gray-400 mb-2">Interval (minutes):</label>
                 <input type="number" id="interval" name="interval" min="1" value="5"
                     class="w-full bg-gray-600 text-white border-gray-500 rounded-md shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50 p-2 mb-4">
-                <button onclick="startAttendance()"
-                    class="w-full bg-green-600 text-white py-3 rounded-lg shadow-md hover:bg-green-700 transition duration-200">Start
-                    Attendance</button>
+                <button id="start-attendance-btn" onclick="startAttendance()"
+                    class="w-full bg-green-600 text-white py-3 rounded-lg shadow-md hover:bg-green-700 transition duration-200">Start Attendance</button>
             </div>
 
             <!-- Student List -->
             <div>
                 <h3 class="text-xl font-semibold mb-4">Student List</h3>
-                <p class="text-sm text-gray-500 mb-4">Max Recognizable People: {{ current_recognized_people }}/{{
-                    max_recognizable_people }}</p>
+                <p class="text-sm text-gray-500 mb-4">Matched Student: {{ current_recognized_people }}/{{ max_recognizable_people }}</p>
                 <ul id="student-list" class="space-y-4">
                     {% for student in students %}
                     <li data-sid="{{ student.sid }}"
@@ -113,8 +115,7 @@
             {% for face in unpaired_faces %}
             <div id="face-card-{{ face.label }}"
                 class="bg-white text-black rounded-lg shadow-md p-4 w-52 text-center hover:shadow-lg transition cursor-pointer">
-                <img src="/{{ face.filepath }}"
-                    class="w-24 h-24 mx-auto object-cover rounded-full border-4 border-purple-400 mb-2"
+                <img src="/{{ face.filepath }}" class="w-24 h-24 mx-auto object-cover rounded-full border-4 border-purple-400 mb-2"
                     alt="Detected face">
                 <button onclick="pairFace('{{ face.label }}')"
                     class="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition duration-200">
@@ -136,13 +137,46 @@
             recognitionMode = mode;
             // Refresh the video feed to apply the new mode
             document.getElementById('video-feed').src = "{{ url_for('processed_video_feed') }}?mode=" + mode;
-            // Update button styles to indicate the active mode
-            document.querySelectorAll('.bg-indigo-600').forEach(btn => {
-                btn.classList.remove('bg-indigo-500');
+
+            // Update button styles to highlight the active mode
+            const buttons = {
+                'face_emotion': document.getElementById('face-emotion-btn'),
+                'face': document.getElementById('face-only-btn'),
+                'emotion': document.getElementById('emotion-only-btn')
+            };
+
+            // Reset all buttons to default state
+            Object.values(buttons).forEach(btn => {
+                btn.classList.remove('bg-cyan-400');
                 btn.classList.add('bg-indigo-600');
+                btn.classList.remove('hover:bg-cyan-500');
+                btn.classList.add('hover:bg-indigo-700');
             });
-            document.querySelector(`button[onclick="setRecognitionMode('${mode}')"]`).classList.remove('bg-indigo-600');
-            document.querySelector(`button[onclick="setRecognitionMode('${mode}')"]`).classList.add('bg-indigo-500');
+
+            // Highlight the active button with a high-contrast color
+            buttons[mode].classList.remove('bg-indigo-600');
+            buttons[mode].classList.add('bg-cyan-400');
+            buttons[mode].classList.remove('hover:bg-indigo-700');
+            buttons[mode].classList.add('hover:bg-cyan-500');
+
+            // Disable/enable buttons based on the mode
+            const captureBtn = document.getElementById('capture-faces-btn');
+            const viewAttendanceBtn = document.getElementById('view-attendance-btn');
+            const startAttendanceBtn = document.getElementById('start-attendance-btn');
+
+            if (mode === 'face' || mode === 'emotion') {
+                // Disable buttons
+                captureBtn.disabled = true;
+                viewAttendanceBtn.classList.add('disabled');
+                viewAttendanceBtn.removeAttribute('href');
+                startAttendanceBtn.disabled = true;
+            } else {
+                // Enable buttons
+                captureBtn.disabled = false;
+                viewAttendanceBtn.classList.remove('disabled');
+                viewAttendanceBtn.setAttribute('href', "{{ url_for('attendance_page') }}");
+                startAttendanceBtn.disabled = false;
+            }
         }
 
         function selectStudent(sid) {
@@ -200,6 +234,10 @@
         }
 
         function captureFace() {
+            if (recognitionMode === 'face' || recognitionMode === 'emotion') {
+                alert('This function is disabled in Face Recognition Only or Emotion Recognition Only mode.');
+                return;
+            }
             fetch("{{ url_for('capture_face') }}", {
                 method: "POST",
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -244,6 +282,10 @@
         }
 
         function startAttendance() {
+            if (recognitionMode === 'face' || recognitionMode === 'emotion') {
+                alert('This function is disabled in Face Recognition Only or Emotion Recognition Only mode.');
+                return;
+            }
             const interval = document.getElementById('interval').value;
             fetch("{{ url_for('start_attendance') }}", {
                 method: "POST",
@@ -279,5 +321,4 @@
         }
     </script>
 </body>
-
 </html>
