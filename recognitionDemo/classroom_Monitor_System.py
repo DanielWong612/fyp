@@ -54,6 +54,7 @@ def load_students():
 
 students, sid_to_name = load_students()
 max_recognizable_people = len(students)  # 設定可辨認的人數上限
+print(f"Number of students loaded: {len(students)}")
 
 # Load known face features from directory
 def load_known_faces(capture_dir):
@@ -375,14 +376,13 @@ def capture_face_from_current_frame():
     
     return capture_unique_unknown_faces(frame)
 
+# In your recognitionDemo/classroom_Monitor_System.py
 def generate_processed_frames(selected_student=None, manual_capture_trigger=False):
     load_known_faces(capture_dir)
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         print("Error: Cannot access camera.")
         return
-
-    frame_embeddings = []  # Save the features of the detected face in the current frame.
 
     while True:
         ret, frame = cap.read()
@@ -391,7 +391,8 @@ def generate_processed_frames(selected_student=None, manual_capture_trigger=Fals
             break
 
         results = yolo_model.predict(source=frame, conf=0.25, imgsz=640, verbose=False)
-        frame_embeddings.clear()
+        frame_embeddings = []
+        recognized_sids = set()  # Track recognized students in this frame
 
         for result in results:
             boxes = result.boxes.xyxy.cpu().numpy() if result.boxes.xyxy is not None else []
@@ -400,41 +401,36 @@ def generate_processed_frames(selected_student=None, manual_capture_trigger=Fals
                 face_img = frame[y1:y2, x1:x2]
                 try:
                     embedding = DeepFace.represent(face_img, model_name='Facenet', enforce_detection=False)[0]["embedding"]
+                    
+                    # Check for duplicates in current frame
+                    is_duplicate = any(cosine_similarity([embedding], [e])[0][0] > high_similarity_threshold 
+                                    for e in frame_embeddings)
+                    
+                    if not is_duplicate:
+                        frame_embeddings.append(embedding)
+                        label, similarity = recognize_face(embedding, known_faces)
+                        
+                        if label and similarity >= similarity_threshold:
+                            recognized_sids.add(label)
+                            student_name = sid_to_name.get(label, "")
+                            display_label = f"{student_name} ({label})"
+                            color = (0, 255, 0)  # Green for recognized
+                        else:
+                            display_label = "Unknown"
+                            color = (255, 255, 0)  # Yellow for unknown
+                            
+                        emotion_label = predict_emotion(face_img)
+                        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+                        cv2.putText(frame, display_label, (x1, y1-25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                        cv2.putText(frame, emotion_label, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+                        
+                        if manual_capture_trigger and selected_student == label and is_frontal_face(face_img):
+                            auto_capture(face_img, label, capture_dir)
+                            manual_capture_trigger = False
+
                 except Exception as e:
                     print(f"Feature extraction error: {e}")
                     continue
-
-                # Check if there is already a similar face in the current frame.
-                is_duplicate = False
-                for existing_embedding in frame_embeddings:
-                    similarity = cosine_similarity([embedding], [existing_embedding])[0][0]
-                    if similarity > high_similarity_threshold:
-                        is_duplicate = True
-                        #print(f"Duplicate face detected in the same frame (similarity: {similarity:.2f})")
-                        break
-
-                if is_duplicate:
-                    continue  # Skip the repetitive faces
-
-                frame_embeddings.append(embedding)  # Recorded Characteristics
-
-                emotion_label = predict_emotion(face_img)
-                recognized_label, similarity = recognize_face(embedding, known_faces)
-
-                if recognized_label:
-                    student_name = sid_to_name.get(recognized_label, "")
-                    display_label = f"{student_name} ({recognized_label}) - {emotion_label}"
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                    cv2.putText(frame, display_label, (x1, y1-25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-                    if manual_capture_trigger and selected_student == recognized_label and is_frontal_face(face_img):
-                        #print(f"Capturing face for {recognized_label}")
-                        auto_capture(face_img, recognized_label, capture_dir)
-                        manual_capture_trigger = False
-                else:
-                    display_label = "Detected"
-                    detected_faces.append(face_img)
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 0), 2)
-                    cv2.putText(frame, display_label, (x1, y1-25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
 
         _, buffer = cv2.imencode('.jpg', frame)
         frame_bytes = buffer.tobytes()

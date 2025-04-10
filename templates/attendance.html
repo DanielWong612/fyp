@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Attendance History - Classroom Monitor System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background-color: #4B5563;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-white font-sans">
+    <div class="min-h-screen p-6">
+        <div class="max-w-4xl mx-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold text-purple-300">Attendance History</h1>
+                <a href="{{ url_for('index') }}" class="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">
+                    Back to Monitor
+                </a>
+            </div>
+
+            {% if attendance_history %}
+            <div class="space-y-6">
+                {% for record in attendance_history %}
+                <div class="bg-gray-800 p-4 rounded-lg shadow-md">
+                    <div class="flex justify-between items-center mb-2">
+                        <h2 class="text-lg font-semibold">{{ record.timestamp }}</h2>
+                        <span class="text-sm text-gray-400">
+                            {{ record.present_count }} / {{ record.total_students }} Present
+                        </span>
+                    </div>
+                    <div class="mt-2">
+                        <p class="text-sm text-gray-300">Recognized Students:</p>
+                        {% if record.recognized_students %}
+                        <ul class="list-disc list-inside mt-1 text-gray-200">
+                            {% for sid in record.recognized_students %}
+                            <li>{{ sid }}</li>
+                            {% endfor %}
+                        </ul>
+                        {% else %}
+                        <p class="text-sm text-gray-500">No students recognized</p>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="bg-gray-800 p-4 rounded-lg shadow-md text-center">
+                <p class="text-gray-400">No attendance records found.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        // Optional: Add real-time refresh if desired
+        function refreshAttendance() {
+            fetch("{{ url_for('get_attendance_history') }}")
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        console.log('Attendance history updated:', data.history);
+                    }
+                });
+        }
+
+        // Uncomment to enable auto-refresh every 30 seconds
+        // setInterval(refreshAttendance, 30000);
+    </script>
+</body>
+
+</html>

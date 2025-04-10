@@ -35,20 +35,39 @@
 
 <body class="bg-gray-900 text-white font-sans">
     <div class="flex flex-col lg:flex-row">
+        <!-- Camera section -->
         <div class="flex-1 p-6 bg-black">
-            <h2 class="text-xl text-purple-300 font-bold mb-3 flex items-center gap-2">
-                Classroom Monitor System
-            </h2>
+            <div class="flex justify-between items-center mb-3">
+                <h2 class="text-xl text-purple-300 font-bold flex items-center gap-2">
+                    Classroom Monitor System
+                </h2>
+            </div>
             <div id="resizable-camera-wrapper" class="mx-auto">
                 <img src="{{ url_for('processed_video_feed') }}" alt="Processed video feed" id="video-feed">
             </div>
-            <button onclick="captureFace()"
-                class="mt-4 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Capture All Detected
-                Faces</button>
         </div>
 
         <div class="w-full lg:w-80 bg-gray-800 p-4 overflow-y-auto border-t lg:border-t-0 lg:border-l border-gray-700">
+            <!-- Swapped positions: Capture All Detected Faces now comes first -->
+            <button onclick="captureFace()"
+                class="mb-4 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Capture All Detected Faces</button>
+
+            <!-- Swapped positions: View Attendance History now comes second -->
+            <a href="{{ url_for('attendance_page') }}" class="mb-4 w-full bg-purple-600 text-white py-2 px-4 rounded hover:bg-purple-700 block text-center">
+                View Attendance History
+            </a>
+
+            <!-- Card View for Roll Call -->
+            <div class="bg-gray-700 p-4 rounded-lg shadow-md mb-6">
+                <label for="interval" class="block text-sm font-medium text-gray-300">Roll Call Interval (minutes):</label>
+                <input type="number" id="interval" name="interval" min="1" value="5"
+                    class="mt-1 block w-full bg-gray-600 text-white border-gray-500 rounded-md shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50">
+                <button onclick="startAttendance()"
+                    class="mt-4 w-full bg-green-600 text-white py-2 rounded hover:bg-green-700">Start Attendance</button>
+            </div>
+
             <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">Student List</h3>
+            <p class="text-sm text-gray-500">Max Recognizable People: {{ current_recognized_people }}/{{ max_recognizable_people }}</p>
             <ul id="student-list" class="space-y-3">
                 {% for student in students %}
                 <li data-sid="{{ student.sid }}"
@@ -69,7 +88,6 @@
 
     <div class="p-6 bg-gray-100 text-gray-900">
         <h3 class="text-xl font-bold mb-4 flex items-center gap-2">AI Detected Faces (To Pair)</h3>
-        <p class="text-sm text-gray-500">Max Recognizable People: {{ max_recognizable_people }}</p>
         <div id="face-list" class="flex flex-wrap gap-6">
             {% if unpaired_faces %}
             {% for face in unpaired_faces %}
@@ -111,12 +129,12 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
-                        document.getElementById(`face-card-${face}`).remove();  // Remove paired images
+                        document.getElementById(`face-card-${face}`).remove();
                         const studentItem = document.querySelector(`#student-list li[data-sid="${selectedStudent}"]`);
-                        studentItem.querySelector('img').src = `{{ url_for('static', filename='thumbnails/') }}${face}`;  // Update student avatar
+                        studentItem.querySelector('img').src = `{{ url_for('static', filename='thumbnails/') }}${face}`;
                         selectedStudent = null;
-                        document.querySelectorAll('#student-list li').forEach(li => li.classList.remove('bg-purple-600'));  // Unselected status
-                        document.getElementById('video-feed').src = "{{ url_for('processed_video_feed') }}";  // Refresh Video Stream
+                        document.querySelectorAll('#student-list li').forEach(li => li.classList.remove('bg-purple-600'));
+                        document.getElementById('video-feed').src = "{{ url_for('processed_video_feed') }}";
                     }
                 })
                 .catch(error => {
@@ -156,7 +174,6 @@
                 .then(data => {
                     if (data.success) {
                         alert(`Captured ${data.captured_faces} unique unknown faces!`);
-                        // Motion Updates Not Matching Faces
                         fetchUnpairedFaces();
                     } else {
                         alert('Capture failed: ' + (data.error || 'Unknown error'));
@@ -169,11 +186,11 @@
         }
 
         function fetchUnpairedFaces() {
-            fetch('/get_unpaired_faces')  // Add a new route to get unmatched faces.
+            fetch('/get_unpaired_faces')
                 .then(response => response.json())
                 .then(data => {
                     const faceList = document.getElementById('face-list');
-                    faceList.innerHTML = '';  // Clear existing content
+                    faceList.innerHTML = '';
                     if (data.unpaired_faces.length > 0) {
                         data.unpaired_faces.forEach(face => {
                             const faceCard = `
@@ -191,7 +208,34 @@
                 });
         }
 
+        function startAttendance() {
+            const interval = document.getElementById('interval').value;
+            fetch("{{ url_for('start_attendance') }}", {
+                method: "POST",
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ interval: interval })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(`Attendance recorded!\nInterval: ${data.interval} minutes\nStudents present: ${data.recognized_count}`);
+                        document.querySelectorAll('#student-list li').forEach(li => {
+                            const sid = li.dataset.sid;
+                            if (data.recognized_students.includes(sid)) {
+                                li.classList.add('bg-green-600');
+                            } else {
+                                li.classList.remove('bg-green-600');
+                            }
+                        });
+                    } else {
+                        alert('Failed to start attendance: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error during attendance:', error);
+                    alert('An error occurred while starting attendance. Please try again.');
+                });
+        }
     </script>
 </body>
-
 </html>
