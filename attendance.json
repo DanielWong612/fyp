@@ -1,17 +1,17 @@
 [
     {
-        "timestamp": "2025-04-11T00:29:56.009503",
+        "timestamp": "2025-04-11T00:29:56.123456",
         "recognized_students": [
-            "23035686D"
+            {"sid": "23035686D", "name": "Daniel Wong"}
         ],
         "total_students": 6,
         "present_count": 1
     },
     {
-        "timestamp": "2025-04-11T00:31:10.194480",
+        "timestamp": "2025-04-11T00:31:10.654321",
         "recognized_students": [
-            "22067588D",
-            "23035686D"
+            {"sid": "22067588D", "name": "Alice"},
+            {"sid": "23035686D", "name": "Daniel Wong"}
         ],
         "total_students": 6,
         "present_count": 2
