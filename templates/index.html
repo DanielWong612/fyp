@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Classroom Face Pairing</title>
+    <title>Classroom Monitor System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         ::-webkit-scrollbar {
@@ -37,7 +37,7 @@
     <div class="flex flex-col lg:flex-row">
         <div class="flex-1 p-6 bg-black">
             <h2 class="text-xl text-purple-300 font-bold mb-3 flex items-center gap-2">
-                <span>📹</span> Live Classroom Feed
+                Classroom Monitor System
             </h2>
             <div id="resizable-camera-wrapper" class="mx-auto">
                 <img src="{{ url_for('processed_video_feed') }}" alt="Processed video feed" id="video-feed">
@@ -48,7 +48,7 @@
         </div>
 
         <div class="w-full lg:w-80 bg-gray-800 p-4 overflow-y-auto border-t lg:border-t-0 lg:border-l border-gray-700">
-            <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">🧑‍🏫 Student List</h3>
+            <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">Student List</h3>
             <ul id="student-list" class="space-y-3">
                 {% for student in students %}
                 <li data-sid="{{ student.sid }}"
@@ -68,7 +68,7 @@
     </div>
 
     <div class="p-6 bg-gray-100 text-gray-900">
-        <h3 class="text-xl font-bold mb-4 flex items-center gap-2">🧠 AI Detected Faces (To Pair)</h3>
+        <h3 class="text-xl font-bold mb-4 flex items-center gap-2">AI Detected Faces (To Pair)</h3>
         <div id="face-list" class="flex flex-wrap gap-6">
             {% if unpaired_faces %}
             {% for face in unpaired_faces %}
@@ -110,12 +110,12 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
-                        document.getElementById(`face-card-${face}`).remove();  // 移除已配對的圖片
+                        document.getElementById(`face-card-${face}`).remove();  // Remove paired images
                         const studentItem = document.querySelector(`#student-list li[data-sid="${selectedStudent}"]`);
-                        studentItem.querySelector('img').src = `{{ url_for('static', filename='thumbnails/') }}${face}`;  // 更新學生頭像
+                        studentItem.querySelector('img').src = `{{ url_for('static', filename='thumbnails/') }}${face}`;  // Update student avatar
                         selectedStudent = null;
-                        document.querySelectorAll('#student-list li').forEach(li => li.classList.remove('bg-purple-600'));  // 取消選擇狀態
-                        document.getElementById('video-feed').src = "{{ url_for('processed_video_feed') }}";  // 刷新視頻流
+                        document.querySelectorAll('#student-list li').forEach(li => li.classList.remove('bg-purple-600'));  // Unselected status
+                        document.getElementById('video-feed').src = "{{ url_for('processed_video_feed') }}";  // Refresh Video Stream
                     }
                 })
                 .catch(error => {
@@ -155,12 +155,38 @@
                 .then(data => {
                     if (data.success) {
                         alert(`Captured ${data.captured_faces} unique unknown faces!`);
-                        location.reload();  //Reload the page to update the list of unpaired faces.
+                        // Motion Updates Not Matching Faces
+                        fetchUnpairedFaces();
+                    } else {
+                        alert('Capture failed: ' + (data.error || 'Unknown error'));
                     }
                 })
                 .catch(error => {
                     console.error('Error during capture:', error);
                     alert('An error occurred while capturing. Please try again.');
+                });
+        }
+
+        function fetchUnpairedFaces() {
+            fetch('/get_unpaired_faces')  // Add a new route to get unmatched faces.
+                .then(response => response.json())
+                .then(data => {
+                    const faceList = document.getElementById('face-list');
+                    faceList.innerHTML = '';  // Clear existing content
+                    if (data.unpaired_faces.length > 0) {
+                        data.unpaired_faces.forEach(face => {
+                            const faceCard = `
+                    <div id="face-card-${face.label}" class="bg-white text-black rounded-lg shadow-md p-4 w-52 text-center hover:shadow-lg transition cursor-pointer">
+                        <img src="/${face.filepath}" class="w-24 h-24 mx-auto object-cover border-4 border-purple-400 mb-2" alt="Detected face">
+                        <button onclick="pairFace('${face.label}')" class="mt-2 w-full bg-purple-600 text-white py-1 rounded hover:bg-purple-700">
+                            Pair
+                        </button>
+                    </div>`;
+                            faceList.innerHTML += faceCard;
+                        });
+                    } else {
+                        faceList.innerHTML = '<p class="text-gray-500">No unpaired faces detected.</p>';
+                    }
                 });
         }
 
