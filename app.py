@@ -304,6 +304,39 @@ def upload_photo():
 
     return jsonify({'success': True})
 
+@app.route('/unmatch_student', methods=['POST'])
+def unmatch_student():
+    student_sid = request.form.get('student_sid')
+    if not student_sid:
+        return jsonify({'success': False, 'error': 'No student SID provided'}), 400
+
+    # Find the student's photo in their directory
+    student_dir = os.path.join(FACE_DB_PATH, student_sid)
+    photo_to_unmatch = None
+    if os.path.exists(student_dir):
+        for filename in os.listdir(student_dir):
+            if filename.lower().endswith(('.jpg', '.jpeg', '.png')):
+                photo_to_unmatch = filename
+                break
+
+    if not photo_to_unmatch:
+        return jsonify({'success': False, 'error': 'No photo found for this student'}), 400
+
+    # Move the photo back to static/face_database
+    old_photo_path = os.path.join(student_dir, photo_to_unmatch)
+    new_photo_path = os.path.join(FACE_DB_PATH, photo_to_unmatch)
+    shutil.move(old_photo_path, new_photo_path)
+    print(f"Moved photo to: {new_photo_path}")
+
+    # Update face_pairings.json to remove the pairing
+    pairings = load_pairings()
+    if photo_to_unmatch in pairings:
+        del pairings[photo_to_unmatch]
+        with open(PAIRINGS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(pairings, f, indent=2)
+
+    return jsonify({'success': True})
+
 def detect_students_in_frame(frame):
     """Detect and recognize students in a single frame"""
     results = yolo_model.predict(source=frame, conf=0.25, imgsz=640, verbose=False)

@@ -64,7 +64,7 @@
         </div>
 
         <!-- Right Sidebar -->
-        <div class="w-full lg:w-[440px] bg-gray-800 p-6 overflow-y-auto border-t lg:border-t-0 lg:border-l border-gray-700">
+        <div class="w-full lg:w-[400px] bg-gray-800 p-6 overflow-y-auto border-t lg:border-t-0 lg:border-l border-gray-700">
             <!-- Action Buttons -->
             <div class="space-y-4 mb-6">
                 <button id="capture-faces-btn" onclick="captureFace()"
@@ -101,13 +101,17 @@
                             <div class="text-sm text-gray-300">ID: {{ student.sid }}</div>
                             <div class="text-sm text-gray-400">Dept: {{ student.dept }}</div>
                         </div>
-                        {% if student.avatar == 'default_avatar.png' %}
-                        <button onclick="openUploadModal('{{ student.sid }}', false); event.stopPropagation();"
-                            class="bg-yellow-500 text-white py-1 px-3 rounded-lg hover:bg-yellow-600 transition duration-200">Upload Photo</button>
-                        {% else %}
-                        <button onclick="openUploadModal('{{ student.sid }}', true); event.stopPropagation();"
-                            class="bg-orange-500 text-white py-1 px-3 rounded-lg hover:bg-orange-600 transition duration-200">Replace Photo</button>
-                        {% endif %}
+                        <div class="flex flex-col gap-2">
+                            {% if student.avatar == 'default_avatar.png' %}
+                            <button onclick="openUploadModal('{{ student.sid }}', false); event.stopPropagation();"
+                                class="bg-yellow-500 text-white py-1 px-3 rounded-lg hover:bg-yellow-600 transition duration-200">Upload Photo</button>
+                            {% else %}
+                            <button onclick="openUploadModal('{{ student.sid }}', true); event.stopPropagation();"
+                                class="bg-orange-500 text-white py-1 px-3 rounded-lg hover:bg-orange-600 transition duration-200">Replace Photo</button>
+                            <button onclick="unmatchStudent('{{ student.sid }}'); event.stopPropagation();"
+                                class="bg-red-500 text-white py-1 px-3 rounded-lg hover:bg-red-600 transition duration-200">Unmatch</button>
+                            {% endif %}
+                        </div>
                     </li>
                     {% endfor %}
                 </ul>
@@ -125,7 +129,7 @@
                 class="bg-white text-black rounded-lg shadow-md p-4 w-52 text-center hover:shadow-lg transition cursor-pointer">
                 <img src="/{{ face.filepath }}" class="w-24 h-24 mx-auto object-cover rounded-full border-4 border-purple-400 mb-2"
                     alt="Detected face">
-                <button onclick="pairFace('{{ face.label }}')"
+                <button onclick="pairFace('{{ face.label }}', '{{ selectedStudent }}')"
                     class="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition duration-200">
                     Pair
                 </button>
@@ -221,6 +225,30 @@
             document.getElementById('upload-form').reset();
         }
 
+        function unmatchStudent(sid) {
+            if (confirm('Are you sure you want to unmatch this student?')) {
+                fetch("{{ url_for('unmatch_student') }}", {
+                    method: "POST",
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({ student_sid: sid })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('Student unmatched successfully!');
+                            // Refresh the page to update the student list
+                            location.reload();
+                        } else {
+                            alert('Failed to unmatch student: ' + (data.error || 'Unknown error'));
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error during unmatching:', error);
+                        alert('An error occurred while unmatching. Please try again.');
+                    });
+            }
+        }
+
         document.getElementById('upload-form').addEventListener('submit', function(e) {
             e.preventDefault();
             const formData = new FormData(this);
@@ -255,7 +283,7 @@
             }
         }
 
-        function pairFace(face) {
+        function pairFace(face, sid) {
             if (!selectedStudent) {
                 alert('Please select a student first!');
                 return;
@@ -270,7 +298,8 @@
                     if (data.success) {
                         document.getElementById(`face-card-${face}`).remove();
                         const studentItem = document.querySelector(`#student-list li[data-sid="${selectedStudent}"]`);
-                        studentItem.querySelector('img').src = `{{ url_for('static', filename='thumbnails/') }}${face}`;
+                        // Construct the correct path to the student's photo
+                        studentItem.querySelector('img').src = `/static/face_database/${selectedStudent}/${face}`;
                         selectedStudent = null;
                         document.querySelectorAll('#student-list li').forEach(li => li.classList.remove('bg-purple-600'));
                         document.getElementById('video-feed').src = "{{ url_for('processed_video_feed') }}?mode=" + recognitionMode;
@@ -300,7 +329,7 @@
                 .catch(error => {
                     console.error('Error during manual capture:', error);
                     alert('An error occurred during manual capture. Please try again.');
-                });
+                    });
         }
 
         function captureFace() {
@@ -342,7 +371,7 @@
                             const faceCard = `
                     <div id="face-card-${face.label}" class="bg-white text-black rounded-lg shadow-md p-4 w-52 text-center hover:shadow-lg transition cursor-pointer">
                         <img src="/${face.filepath}" class="w-24 h-24 mx-auto object-cover rounded-full border-4 border-purple-400 mb-2" alt="Detected face">
-                        <button onclick="pairFace('${face.label}')" class="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition duration-200">
+                        <button onclick="pairFace('${face.label}', '${selectedStudent}')" class="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition duration-200">
                             Pair
                         </button>
                     </div>`;
