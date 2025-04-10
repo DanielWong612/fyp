@@ -317,12 +317,14 @@ def capture_face_from_current_frame():
     if not cap.isOpened():
         print("Error: Cannot access camera.")
         return []
-
+    
     ret, frame = cap.read()
     cap.release()
     if not ret:
         print("Error: Failed to read frame.")
         return []
+    
+    return capture_unique_unknown_faces(frame)
 
     return capture_unique_unknown_faces(frame)
 def generate_processed_frames(selected_student=None, manual_capture_trigger=False):

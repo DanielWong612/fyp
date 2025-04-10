@@ -87,13 +87,16 @@ def processed_video_feed():
 
 @app.route('/capture_face', methods=['POST'])
 def capture_face():
-    captured_faces = capture_face_from_current_frame()
-    return jsonify({'success': True, 'captured_faces': len(captured_faces)})
+    try:
+        captured_faces = capture_face_from_current_frame()
+        return jsonify({'success': True, 'captured_faces': len(captured_faces)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/capture_all_faces', methods=['POST'])
 def capture_all_faces():
     for i, face_img in enumerate(detected_faces):
-        filename = f"user_{i + 1}.png"  # e.g user_1.png
+        filename = f"user_{i + 1}.jpg"  # e.g user_1.png
         filepath = os.path.join(FACE_DB_PATH, filename)  # Save Path：static/face_database/user_1.png
         cv2.imwrite(filepath, face_img)
         
