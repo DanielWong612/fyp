@@ -11,6 +11,7 @@ from recognitionDemo.classroom_Monitor_System import (
     yolo_model,
     sid_to_name
 )
+from recognitionDemo.recognition_emotion import detect_and_classify_faces  # Import from recognition_emotion.py
 import cv2
 import numpy as np
 from datetime import datetime
@@ -28,6 +29,9 @@ FACE_DB_PATH = 'static/face_database'
 DEFAULT_AVATAR = 'default_avatar.png'
 ATTENDANCE_FILE = 'attendance.json'
 similarity_threshold = 0.6
+
+# Emotion labels (must match those in recognition_emotion.py)
+emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
 
 def load_students():
     with open(STUDENTS_FILE, 'r', encoding='utf-8') as f:
@@ -90,6 +94,75 @@ def save_attendance_history(attendance_history):
     with open(ATTENDANCE_FILE, 'w', encoding='utf-8') as f:
         json.dump(attendance_history, f, ensure_ascii=False, indent=4)
 
+# New function to generate video feed for emotion recognition only
+def generate_emotion_recognition_feed():
+    cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        print("Error: Cannot access camera.")
+        return
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            print("Failed to read frame.")
+            break
+
+        # Use detect_and_classify_faces from recognition_emotion.py
+        output_frame, face_count, faces_data, emotion_counter, unique_face_count = detect_and_classify_faces(frame)
+
+        # Draw rectangles and labels for each detected face
+        for (x1, y1, x2, y2), label in faces_data:
+            cv2.rectangle(output_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            # Dynamically adjust label position
+            if y1 - 10 > 10:  # If there is enough space above
+                cv2.putText(output_frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+            else:  # Otherwise, display below
+                cv2.putText(output_frame, label, (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+
+        # Display total face count at the bottom of the frame
+        h, w = output_frame.shape[:2]
+        cv2.putText(output_frame, f"Total Faces: {face_count}", (10, h - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
+
+        # Display the emotion counter in the top-right corner
+        text_x = w - 150  # Position 150 pixels from the right edge
+        text_y = 30  # Start 30 pixels from the top
+        line_spacing = 20  # Space between lines
+
+        # Calculate the dimensions of the counter area
+        counter_height = (len(emotion_labels) + 2) * line_spacing + 10  # +2 for "Total Students" and "Total Faces in Frame"
+        counter_width = 140  # Width of the counter area
+        counter_x = w - 160  # Slightly more padding on the left
+        counter_y = 20  # Slightly more padding on the top
+
+        # Draw a semi-transparent white rectangle as the background
+        overlay = output_frame.copy()
+        cv2.rectangle(overlay, (counter_x, counter_y), 
+                      (counter_x + counter_width, counter_y + counter_height), 
+                      (255, 255, 255), -1)  # White rectangle
+        alpha = 0.7  # Transparency factor
+        cv2.addWeighted(overlay, alpha, output_frame, 1 - alpha, 0, output_frame)
+
+        # Display "Total Students" and "Total Faces in Frame"
+        total_faces_text = f"Total Faces: {face_count}"
+        text_y += line_spacing
+        cv2.putText(output_frame, total_faces_text, (text_x, text_y), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+        text_y += line_spacing + 10  # Add extra spacing after counts
+
+        # Display all emotions
+        for i, (emotion, count) in enumerate(emotion_counter.items()):
+            text = f"{emotion}: {count}"
+            cv2.putText(output_frame, text, (text_x, text_y + i * line_spacing), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+
+        _, buffer = cv2.imencode('.jpg', output_frame)
+        frame_bytes = buffer.tobytes()
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+
+    cap.release()
+
 @app.route('/')
 def index():
     students = load_students()
@@ -123,7 +196,12 @@ def manual_capture_route():
 @app.route('/processed_video_feed')
 def processed_video_feed():
     mode = request.args.get('mode', 'face_emotion')
-    return Response(generate_processed_frames(mode=mode), mimetype='multipart/x-mixed-replace; boundary=frame')
+    if mode == 'emotion':
+        # Use the emotion recognition feed from recognition_emotion.py
+        return Response(generate_emotion_recognition_feed(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    else:
+        # Use the default feed from classroom_Monitor_System.py
+        return Response(generate_processed_frames(mode=mode), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/capture_face', methods=['POST'])
 def capture_face():

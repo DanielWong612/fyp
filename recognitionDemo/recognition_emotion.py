@@ -41,6 +41,8 @@ def detect_and_classify_faces(frame):
 
     face_count = 0  # Counter for detected faces
     faces_data = []  # Store face rectangles and labels
+    emotion_counter = {label: 0 for label in emotion_labels}  # Initialize emotion counter
+    unique_faces = set()  # Track unique faces to avoid duplicates
 
     for i in range(detections.shape[2]):
         confidence = detections[0, 0, i, 2]
@@ -61,10 +63,18 @@ def detect_and_classify_faces(frame):
             emotion_label = emotion_labels[emotion_index]
             confidence = np.max(predictions)
 
+            # Track unique faces using a simple hash of the bounding box coordinates
+            face_hash = f"{x1}_{y1}_{x2}_{y2}"
+            if face_hash not in unique_faces:
+                unique_faces.add(face_hash)
+                # Increment the emotion counter
+                if emotion_label in emotion_counter:
+                    emotion_counter[emotion_label] += 1
+
             # Add face data for drawing later
             faces_data.append(((x1, y1, x2, y2), f"{emotion_label}: {confidence:.2f}"))
 
-    return frame, face_count, faces_data
+    return frame, face_count, faces_data, emotion_counter, len(unique_faces)
 
 # Main function for video processing
 def main():
@@ -83,8 +93,8 @@ def main():
         if not ret:
             break
 
-        # Detect and classify faces, count total faces
-        output_frame, face_count, faces_data = detect_and_classify_faces(frame)
+        # Detect and classify faces, count total faces, and get emotion counter
+        output_frame, face_count, faces_data, emotion_counter = detect_and_classify_faces(frame)
 
         # Draw rectangles and labels for each detected face
         for (x1, y1, x2, y2), label in faces_data:
@@ -99,6 +109,38 @@ def main():
         h, w = output_frame.shape[:2]
         cv2.putText(output_frame, f"Total Faces: {face_count}", (10, h - 10),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
+
+        # Display the emotion counter in the top-right corner
+        text_x = w - 150  # Position 150 pixels from the right edge
+        text_y = 30  # Start 30 pixels from the top
+        line_spacing = 20  # Space between lines
+
+        # Calculate the dimensions of the counter area
+        counter_height = (len(emotion_labels) + 2) * line_spacing + 10  # +2 for "Total Students" and "Total Faces in Frame"
+        counter_width = 140  # Width of the counter area
+        counter_x = w - 160  # Slightly more padding on the left
+        counter_y = 20  # Slightly more padding on the top
+
+        # Draw a semi-transparent white rectangle as the background
+        overlay = output_frame.copy()
+        cv2.rectangle(overlay, (counter_x, counter_y), 
+                      (counter_x + counter_width, counter_y + counter_height), 
+                      (255, 255, 255), -1)  # White rectangle
+        alpha = 0.7  # Transparency factor
+        cv2.addWeighted(overlay, alpha, output_frame, 1 - alpha, 0, output_frame)
+
+        # Display "Total Students" and "Total Faces in Frame"
+        total_faces_text = f"Total Faces: {face_count}"
+        text_y += line_spacing
+        cv2.putText(output_frame, total_faces_text, (text_x, text_y), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+        text_y += line_spacing + 10  # Add extra spacing after counts
+
+        # Display all emotions
+        for i, (emotion, count) in enumerate(emotion_counter.items()):
+            text = f"{emotion}: {count}"
+            cv2.putText(output_frame, text, (text_x, text_y + i * line_spacing), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
 
         # Display the frame
         cv2.imshow(window_name, output_frame)
