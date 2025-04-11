@@ -377,12 +377,18 @@ def generate_processed_frames(selected_student=None, manual_capture_trigger=Fals
             print("Failed to read frame.")
             break
 
+        # Initialize emotion counter for the current frame
+        emotion_counter = {label: 0 for label in emotion_labels}
+        total_students = 0  # Counter for unique students (after duplicate filtering)
+        total_faces_in_frame = 0  # Counter for all faces detected in the frame
+
         results = yolo_model.predict(source=frame, conf=0.25, imgsz=640, verbose=False)
         frame_embeddings = []
         recognized_sids = set()
 
         for result in results:
             boxes = result.boxes.xyxy.cpu().numpy() if result.boxes.xyxy is not None else []
+            total_faces_in_frame = len(boxes)  # Count all faces detected by YOLO
             for box in boxes:
                 x1, y1, x2, y2 = map(int, box[:4])
                 face_img = frame[y1:y2, x1:x2]
@@ -398,6 +404,7 @@ def generate_processed_frames(selected_student=None, manual_capture_trigger=Fals
                 
                 if not is_duplicate:
                     frame_embeddings.append(embedding)
+                    total_students += 1  # Increment total students for each unique face
 
                     # Determine what to display based on the mode
                     display_label = "Unknown"
@@ -415,6 +422,17 @@ def generate_processed_frames(selected_student=None, manual_capture_trigger=Fals
 
                         if mode in ['face_emotion', 'emotion']:  # Emotion recognition
                             emotion_label = predict_emotion(face_img)
+                            # Extract the emotion name (without confidence) for counting
+                            emotion_name = emotion_label.split(':')[0].strip()
+                            if emotion_name in emotion_counter:
+                                emotion_counter[emotion_name] += 1
+                            else:
+                                # Handle "Neutral" or "Unknown" cases
+                                if emotion_label == "Neutral":
+                                    emotion_counter["Neutral"] += 1
+                                elif emotion_label == "Unknown":
+                                    # Optionally handle "Unknown" emotions
+                                    pass
 
                         # Draw the bounding box and labels
                         cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
@@ -428,6 +446,39 @@ def generate_processed_frames(selected_student=None, manual_capture_trigger=Fals
                     except Exception as e:
                         print(f"Feature extraction error: {e}")
                         continue
+
+        # Display the total students, total faces in frame, and emotion counter in the top-right corner
+        frame_height, frame_width = frame.shape[:2]
+        text_x = frame_width - 150  # Position 150 pixels from the right edge
+        text_y = 30  # Start 30 pixels from the top
+        line_spacing = 20  # Space between lines
+
+        # Calculate the dimensions of the counter area
+        counter_height = (len(emotion_labels) + 2) * line_spacing + 10  # +2 for "Total Students" and "Total Faces in Frame"
+        counter_width = 140  # Width of the counter area
+        counter_x = frame_width - 160  # Slightly more padding on the left
+        counter_y = 20  # Slightly more padding on the top
+
+        # Draw a semi-transparent white rectangle as the background
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (counter_x, counter_y), 
+                      (counter_x + counter_width, counter_y + counter_height), 
+                      (255, 255, 255), -1)  # White rectangle
+        alpha = 0.7  # Transparency factor
+        cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
+
+        # Display "Total Students" and "Total Faces in Frame"
+        total_faces_text = f"Total Faces: {total_faces_in_frame}"
+        text_y += line_spacing
+        cv2.putText(frame, total_faces_text, (text_x, text_y), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+        text_y += line_spacing + 10  # Add extra spacing after counts
+
+        # Display all emotions
+        for i, (emotion, count) in enumerate(emotion_counter.items()):
+            text = f"{emotion}: {count}"
+            cv2.putText(frame, text, (text_x, text_y + i * line_spacing), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
 
         _, buffer = cv2.imencode('.jpg', frame)
         frame_bytes = buffer.tobytes()
