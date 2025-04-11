@@ -13,5 +13,6 @@
 /static/thumbnails
 face_recognition.log
 temp_face.jpg
-/static/face_database
+static/face_database1
 face_pairings.json
+
