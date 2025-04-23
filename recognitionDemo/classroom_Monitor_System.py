@@ -92,29 +92,40 @@ def is_frontal_face(face_img):
     return False
 
 # Save face image
-def auto_capture(face_img, label, capture_dir):
+def auto_capture(face_img, label=None, capture_dir=capture_dir):
+    pairings = {}
     try:
-        embedding = DeepFace.represent(
-            face_img,
-            model_name='Facenet',
-            enforce_detection=False
-        )[0]["embedding"]
-        existing_label = get_new_label(embedding, known_faces)
-        if existing_label != label:
-            label = existing_label
-    except Exception as e:
-        print(f"Feature extraction error during auto_capture: {e}")
+        with open('face_pairings.json', 'r', encoding='utf-8') as f:
+            pairings = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass  
 
-    base_filename = f"{label}.jpg"
-    filepath = os.path.join(capture_dir, base_filename)
+    existing_user_ids = [
+        int(k.replace("user", "").replace(".jpg", "").split("_")[0])
+        for k in pairings.keys()
+        if k.startswith("user") and k.replace("user", "").replace(".jpg", "").split("_")[0].isdigit()
+    ]
+    next_id = max(existing_user_ids, default=0) + 1
+
+    base_label = f"user{next_id}"
+    filename = f"{base_label}.jpg"
+    filepath = os.path.join(capture_dir, filename)
     counter = 1
-    while os.path.exists(filepath):
-        new_filename = f"{label}_{counter}.jpg"
-        filepath = os.path.join(capture_dir, new_filename)
+
+    while os.path.exists(filepath) or filename in pairings:
+        filename = f"{base_label}_{counter}.jpg"
+        filepath = os.path.join(capture_dir, filename)
         counter += 1
+
     cv2.imwrite(filepath, face_img)
-    print(f"Saved face to: {filepath}")
+
+    pairings[filename] = base_label
+    with open('face_pairings.json', 'w', encoding='utf-8') as f:
+        json.dump(pairings, f, indent=2, ensure_ascii=False)
+
+    print(f"[AutoCapture] Saved: {filename}, Mapped to: {base_label}")
     return filepath
+
 
 def recognize_face(embedding, known_faces, threshold=similarity_threshold):
     best_label = None
@@ -377,6 +388,104 @@ def generate_processed_frames(selected_student=None, manual_capture_trigger=Fals
             print("Failed to read frame.")
             break
 
+        emotion_counter = {label: 0 for label in emotion_labels}
+        total_students = 0
+        total_faces_in_frame = 0
+
+        results = yolo_model.predict(source=frame, conf=0.25, imgsz=640, verbose=False)
+        frame_embeddings = []
+        recognized_sids = set()
+
+        for result in results:
+            boxes = result.boxes.xyxy.cpu().numpy() if result.boxes.xyxy is not None else []
+            total_faces_in_frame = len(boxes)
+
+            for box in boxes:
+                x1, y1, x2, y2 = map(int, box[:4])
+                face_img = frame[y1:y2, x1:x2]
+
+                try:
+                    embedding = DeepFace.represent(face_img, model_name='Facenet', enforce_detection=False)[0]["embedding"]
+                except Exception as e:
+                    print(f"Feature extraction error: {e}")
+                    continue
+
+                label, similarity = recognize_face(embedding, known_faces)
+
+                # === 決定 label 與框色 ===
+                display_label = "Unknown"
+                box_color = (255, 255, 255)  # 預設白色
+
+                if label:
+                    if label in sid_to_name:
+                        display_label = f"{sid_to_name[label]} ({label})"
+                        box_color = (0, 255, 0)  # 綠色
+                    elif label.startswith("user") and label in known_faces:
+                        display_label = label
+                        box_color = (255, 255, 0)  # 藍色
+
+                # === 表情辨識 ===
+                emotion_label = ""
+                if mode in ['face_emotion', 'emotion']:
+                    emotion_label = predict_emotion(face_img)
+                    emotion_name = emotion_label.split(":")[0].strip()
+                    if emotion_name in emotion_counter:
+                        emotion_counter[emotion_name] += 1
+
+                # === 繪製框與文字 ===
+                cv2.rectangle(frame, (x1, y1), (x2, y2), box_color, 2)
+                if display_label:
+                    cv2.putText(frame, display_label, (x1, y1 - 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, box_color, 2)
+                if emotion_label:
+                    cv2.putText(frame, emotion_label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+
+        # === 顯示情緒統計與總人數區塊 ===
+        frame_height, frame_width = frame.shape[:2]
+        text_x = frame_width - 150
+        text_y = 30
+        line_spacing = 20
+        counter_height = (len(emotion_labels) + 2) * line_spacing + 10
+        counter_width = 140
+        counter_x = frame_width - 160
+        counter_y = 20
+
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (counter_x, counter_y), 
+                      (counter_x + counter_width, counter_y + counter_height), 
+                      (255, 255, 255), -1)
+        alpha = 0.7
+        cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
+
+        total_faces_text = f"Total Faces: {total_faces_in_frame}"
+        text_y += line_spacing
+        cv2.putText(frame, total_faces_text, (text_x, text_y), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+        text_y += line_spacing + 10
+
+        for i, (emotion, count) in enumerate(emotion_counter.items()):
+            text = f"{emotion}: {count}"
+            cv2.putText(frame, text, (text_x, text_y + i * line_spacing), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+
+        _, buffer = cv2.imencode('.jpg', frame)
+        frame_bytes = buffer.tobytes()
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+
+    cap.release()
+
+    load_known_faces(capture_dir)
+    cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        print("Error: Cannot access camera.")
+        return
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            print("Failed to read frame.")
+            break
+
         # Initialize emotion counter for the current frame
         emotion_counter = {label: 0 for label in emotion_labels}
         total_students = 0  # Counter for unique students (after duplicate filtering)
@@ -392,60 +501,44 @@ def generate_processed_frames(selected_student=None, manual_capture_trigger=Fals
             for box in boxes:
                 x1, y1, x2, y2 = map(int, box[:4])
                 face_img = frame[y1:y2, x1:x2]
+
                 try:
                     embedding = DeepFace.represent(face_img, model_name='Facenet', enforce_detection=False)[0]["embedding"]
                 except Exception as e:
                     print(f"Feature extraction error: {e}")
                     continue
 
-                # Check for duplicates in current frame
-                is_duplicate = any(cosine_similarity([embedding], [e])[0][0] > high_similarity_threshold 
-                                for e in frame_embeddings)
-                
-                if not is_duplicate:
-                    frame_embeddings.append(embedding)
-                    total_students += 1  # Increment total students for each unique face
+                display_label = "Unknown"
+                box_color = (255, 255, 255)  # white
 
-                    # Determine what to display based on the mode
-                    display_label = "Unknown"
-                    color = (255, 255, 0)  # Yellow for unknown by default
-                    emotion_label = ""
+                try:
+                    label, similarity = recognize_face(embedding, known_faces)
+                except Exception as e:
+                    print(f"Recognition error: {e}")
+                    label = None
 
-                    try:
-                        if mode in ['face_emotion', 'face']:  # Face recognition
-                            label, similarity = recognize_face(embedding, known_faces)
-                            if label and similarity >= similarity_threshold:
-                                recognized_sids.add(label)
-                                student_name = sid_to_name.get(label, "")
-                                display_label = f"{student_name} ({label})"
-                                color = (0, 255, 0)  # Green for recognized
+                if label:
+                    if label in sid_to_name:
+                        display_label = f"{sid_to_name[label]} ({label})"
+                        box_color = (0, 255, 0)  # green
+                    else:
+                        display_label = label
+                        box_color = (255, 120, 0)  # blue
 
-                        if mode in ['face_emotion', 'emotion']:  # Emotion recognition
-                            emotion_label = predict_emotion(face_img)
-                            # Extract the emotion name (without confidence) for counting
-                            emotion_name = emotion_label.split(':')[0].strip()
-                            if emotion_name in emotion_counter:
-                                emotion_counter[emotion_name] += 1
-                            else:
-                                # Handle "Neutral" or "Unknown" cases
-                                if emotion_label == "Neutral":
-                                    emotion_counter["Neutral"] += 1
-                                elif emotion_label == "Unknown":
-                                    # Optionally handle "Unknown" emotions
-                                    pass
+                emotion_label = ""
+                if mode in ['face_emotion', 'emotion']:
+                    emotion_label = predict_emotion(face_img)
+                    emotion_name = emotion_label.split(":")[0].strip()
+                    if emotion_name in emotion_counter:
+                        emotion_counter[emotion_name] += 1
 
-                        # Draw the bounding box and labels
-                        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-                        cv2.putText(frame, display_label, (x1, y1-25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-                        if emotion_label:
-                            cv2.putText(frame, emotion_label, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+                # Draw bounding box and labels
+                cv2.rectangle(frame, (x1, y1), (x2, y2), box_color, 2)
+                if display_label:
+                    cv2.putText(frame, display_label, (x1, y1 - 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, box_color, 2)
+                if emotion_label:
+                    cv2.putText(frame, emotion_label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
 
-                        if manual_capture_trigger and selected_student == label and is_frontal_face(face_img):
-                            auto_capture(face_img, label, capture_dir)
-                            manual_capture_trigger = False
-                    except Exception as e:
-                        print(f"Feature extraction error: {e}")
-                        continue
 
         # Display the total students, total faces in frame, and emotion counter in the top-right corner
         frame_height, frame_width = frame.shape[:2]

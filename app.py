@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, Response, jsonify
 import os
 import json
 import shutil
+
 from recognitionDemo.classroom_Monitor_System import (
     generate_processed_frames, 
     detected_faces, 
@@ -11,6 +12,7 @@ from recognitionDemo.classroom_Monitor_System import (
     yolo_model,
     sid_to_name
 )
+
 from recognitionDemo.recognition_emotion import detect_and_classify_faces  # Import from recognition_emotion.py
 import cv2
 import numpy as np
@@ -19,6 +21,15 @@ from sklearn.metrics.pairwise import cosine_similarity
 from deepface import DeepFace
 
 app = Flask(__name__)
+
+from flask_apscheduler import APScheduler
+
+class Config:
+    SCHEDULER_API_ENABLED = True
+
+scheduler = APScheduler()
+scheduler.init_app(app)
+scheduler.start()
 
 # Enable the 'do' extension for Jinja2
 app.jinja_env.add_extension('jinja2.ext.do')
@@ -55,10 +66,12 @@ def get_first_face_images():
     for filename in sorted(os.listdir(FACE_DB_PATH)):
         if filename.startswith('user') and filename.lower().endswith('.jpg'):
             src_path = os.path.join(FACE_DB_PATH, filename)
-            if os.path.isfile(src_path): 
-                if filename not in pairings:
+            if os.path.isfile(src_path):
+                mapped_value = pairings.get(filename, "")
+                if mapped_value == filename.replace(".jpg", ""):
                     user_faces.append({'label': filename, 'filepath': src_path})
     return user_faces
+
 
 def map_student_faces(students, pairings):
     for student in students:
@@ -177,15 +190,23 @@ def index():
 
 @app.route('/pair', methods=['POST'])
 def pair():
-    image = request.form['image']  
-    student_sid = request.form['student_sid']  
+    image = request.form['image']
+    student_sid = request.form['student_sid']
     src_path = os.path.join(FACE_DB_PATH, image)
     dst_dir = os.path.join(FACE_DB_PATH, student_sid)
     os.makedirs(dst_dir, exist_ok=True)
     dst_path = os.path.join(dst_dir, image)
     shutil.move(src_path, dst_path)
     save_pairing(image, student_sid)
+
+    # ✅ 重建 embedding
+    from recognitionDemo.classroom_Monitor_System import load_known_faces, capture_dir, known_faces
+    known_faces.clear()
+    load_known_faces(capture_dir)
+    print("[DEBUG] known_faces updated after pairing")
+
     return jsonify({'success': True, 'image': image, 'student_sid': student_sid})
+
 
 @app.route('/manual_capture', methods=['POST'])
 def manual_capture_route():
@@ -211,23 +232,36 @@ def capture_face():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/capture_all_faces', methods=['POST'])
-def capture_all_faces():
-    for i, face_img in enumerate(detected_faces):
-        filename = f"user_{i + 1}.jpg"
-        filepath = os.path.join(FACE_DB_PATH, filename)
-        cv2.imwrite(filepath, face_img)
-        
-        pairings = load_pairings()
-        if filename in pairings:
-            student_sid = pairings[filename]
-            student_dir = os.path.join(FACE_DB_PATH, student_sid)
-            os.makedirs(student_dir, exist_ok=True)
-            dst_path = os.path.join(student_dir, filename)
-            shutil.move(filepath, dst_path)
-    
-    detected_faces.clear()
-    return jsonify({'success': True})
+# @app.route('/capture_all_faces', methods=['POST'])
+# def capture_all_faces():
+#     pairings = load_pairings()
+#     print("123")
+#     existing_numbers = [
+#         int(name.replace("user", "").replace(".jpg", ""))
+#         for name in pairings.keys()
+#         if name.startswith("user") and name.replace("user", "").replace(".jpg", "").isdigit()
+#     ]
+#     next_user_id = max(existing_numbers, default=0) + 1
+
+#     new_pairings = {} 
+
+#     for face_img in detected_faces:
+#         filename = f"user{next_user_id}.jpg"
+#         filepath = os.path.join(FACE_DB_PATH, filename)
+
+#         cv2.imwrite(filepath, face_img)
+
+#         pairings[filename] = f"user{next_user_id}"
+#         new_pairings[filename] = f"user{next_user_id}"
+
+#         next_user_id += 1
+
+#     with open(PAIRINGS_FILE, 'w', encoding='utf-8') as f:
+#         json.dump(pairings, f, indent=2)
+
+#     detected_faces.clear()
+
+#     return jsonify({'success': True, 'new_pairings': new_pairings})
 
 @app.route('/start_attendance', methods=['POST'])
 def start_attendance():
@@ -388,7 +422,6 @@ def unmatch_student():
     if not student_sid:
         return jsonify({'success': False, 'error': 'No student SID provided'}), 400
 
-    # Find the student's photo in their directory
     student_dir = os.path.join(FACE_DB_PATH, student_sid)
     photo_to_unmatch = None
     if os.path.exists(student_dir):
@@ -400,20 +433,30 @@ def unmatch_student():
     if not photo_to_unmatch:
         return jsonify({'success': False, 'error': 'No photo found for this student'}), 400
 
-    # Move the photo back to static/face_database
+    # Move the photo back to face_database root
     old_photo_path = os.path.join(student_dir, photo_to_unmatch)
     new_photo_path = os.path.join(FACE_DB_PATH, photo_to_unmatch)
     shutil.move(old_photo_path, new_photo_path)
     print(f"Moved photo to: {new_photo_path}")
 
-    # Update face_pairings.json to remove the pairing
+    # Update face_pairings.json: set value back to userX
     pairings = load_pairings()
     if photo_to_unmatch in pairings:
-        del pairings[photo_to_unmatch]
+        original_label = photo_to_unmatch.replace(".jpg", "")
+        pairings[photo_to_unmatch] = original_label
         with open(PAIRINGS_FILE, 'w', encoding='utf-8') as f:
             json.dump(pairings, f, indent=2)
 
+    # Remove the now-empty student folder
+    if os.path.exists(student_dir) and not os.listdir(student_dir):
+        os.rmdir(student_dir)
+
+    from recognitionDemo.classroom_Monitor_System import load_known_faces, capture_dir, known_faces
+    known_faces.clear()
+    load_known_faces(capture_dir)
+
     return jsonify({'success': True})
+
 
 def detect_students_in_frame(frame):
     """Detect and recognize students in a single frame"""
@@ -457,6 +500,40 @@ def recognize_face(embedding, known_faces, threshold=similarity_threshold):
                 best_similarity = similarity
                 best_label = label if similarity > threshold else None
     return best_label, best_similarity
+
+def scheduled_attendance():
+    cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        print("[Scheduler] Cannot access camera")
+        return
+
+    ret, frame = cap.read()
+    cap.release()
+
+    if not ret:
+        print("[Scheduler] Failed to capture frame")
+        return
+
+    recognized_students = detect_students_in_frame(frame)
+    recognized_students_with_names = [
+        {'sid': sid, 'name': sid_to_name.get(sid, 'Unknown')}
+        for sid in recognized_students
+    ]
+
+    new_record = {
+        'timestamp': datetime.now().isoformat(),
+        'recognized_students': recognized_students_with_names,
+        'total_students': len(load_students()),
+        'present_count': len(recognized_students)
+    }
+
+    attendance_history = load_attendance_history()
+    attendance_history.append(new_record)
+    save_attendance_history(attendance_history)
+
+    print(f"[Scheduler] Attendance recorded at {new_record['timestamp']} ({new_record['present_count']} present)")
+
+scheduler.add_job(id='ScheduledAttendance', func=scheduled_attendance, trigger='interval', minutes=5)
 
 if __name__ == '__main__':
     app.run(debug=True)

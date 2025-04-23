@@ -35,7 +35,8 @@
         /* Style for disabled buttons */
         button:disabled,
         a.disabled {
-            background-color: #6b7280 !important; /* Grayed out */
+            background-color: #6b7280 !important;
+            /* Grayed out */
             cursor: not-allowed;
             opacity: 0.6;
         }
@@ -51,11 +52,14 @@
                 <!-- Recognition Mode Selection -->
                 <div class="flex flex-wrap gap-3">
                     <button id="face-emotion-btn" onclick="setRecognitionMode('face_emotion')"
-                        class="bg-cyan-400 text-white py-2 px-4 rounded-lg shadow-md hover:bg-cyan-500 transition duration-200">Face + Emotion Recognition</button>
+                        class="bg-cyan-400 text-white py-2 px-4 rounded-lg shadow-md hover:bg-cyan-500 transition duration-200">Face
+                        + Emotion Recognition</button>
                     <button id="face-only-btn" onclick="setRecognitionMode('face')"
-                        class="bg-indigo-600 text-white py-2 px-4 rounded-lg shadow-md hover:bg-indigo-700 transition duration-200">Face Recognition Only</button>
+                        class="bg-indigo-600 text-white py-2 px-4 rounded-lg shadow-md hover:bg-indigo-700 transition duration-200">Face
+                        Recognition Only</button>
                     <button id="emotion-only-btn" onclick="setRecognitionMode('emotion')"
-                        class="bg-indigo-600 text-white py-2 px-4 rounded-lg shadow-md hover:bg-indigo-700 transition duration-200">Emotion Recognition Only</button>
+                        class="bg-indigo-600 text-white py-2 px-4 rounded-lg shadow-md hover:bg-indigo-700 transition duration-200">Emotion
+                        Recognition Only</button>
                 </div>
             </div>
             <div id="resizable-camera-wrapper" class="mx-auto">
@@ -64,11 +68,13 @@
         </div>
 
         <!-- Right Sidebar -->
-        <div class="w-full lg:w-[400px] bg-gray-800 p-6 overflow-y-auto border-t lg:border-t-0 lg:border-l border-gray-700">
+        <div
+            class="w-full lg:w-[400px] bg-gray-800 p-6 overflow-y-auto border-t lg:border-t-0 lg:border-l border-gray-700">
             <!-- Action Buttons -->
             <div class="space-y-4 mb-6">
                 <button id="capture-faces-btn" onclick="captureFace()"
-                    class="w-full bg-blue-600 text-white py-3 rounded-lg shadow-md hover:bg-blue-700 transition duration-200">Capture All Detected Faces</button>
+                    class="w-full bg-blue-600 text-white py-3 rounded-lg shadow-md hover:bg-blue-700 transition duration-200">Capture
+                    All Detected Faces</button>
                 <a id="view-attendance-btn" href="{{ url_for('attendance_page') }}"
                     class="w-full bg-purple-600 text-white py-3 rounded-lg shadow-md hover:bg-purple-700 block text-center transition duration-200">
                     View Attendance History
@@ -82,20 +88,22 @@
                 <input type="number" id="interval" name="interval" min="1" value="5"
                     class="w-full bg-gray-600 text-white border-gray-500 rounded-md shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50 p-2 mb-4">
                 <button id="start-attendance-btn" onclick="startAttendance()"
-                    class="w-full bg-green-600 text-white py-3 rounded-lg shadow-md hover:bg-green-700 transition duration-200">Start Attendance</button>
+                    class="w-full bg-green-600 text-white py-3 rounded-lg shadow-md hover:bg-green-700 transition duration-200">Start
+                    Attendance</button>
             </div>
 
             <!-- Student List -->
             <div>
                 <h3 class="text-xl font-semibold mb-4">Student List</h3>
-                <p class="text-sm text-gray-500 mb-4">Matched Student: {{ current_recognized_people }}/{{ max_recognizable_people }}</p>
+                <p class="text-sm text-gray-500 mb-4">Matched Student: {{ current_recognized_people }}/{{
+                    max_recognizable_people }}</p>
                 <ul id="student-list" class="space-y-4">
                     {% for student in students %}
                     <li data-sid="{{ student.sid }}"
                         class="bg-gray-700 p-4 rounded-lg flex gap-4 items-center shadow hover:bg-gray-600 transition cursor-pointer"
                         onclick="selectStudent('{{ student.sid }}')">
-                        <img src="{{ url_for('static', filename=student.avatar) }}"
-                            class="w-12 h-12 object-cover" alt="Student avatar">
+                        <img src="{{ url_for('static', filename=student.avatar) }}" class="w-12 h-12 object-cover"
+                            alt="Student avatar">
                         <div class="flex-1">
                             <div class="font-bold text-lg">{{ student.name }}</div>
                             <div class="text-sm text-gray-300">ID: {{ student.sid }}</div>
@@ -104,10 +112,12 @@
                         <div class="flex flex-col gap-2">
                             {% if student.avatar == 'default_avatar.png' %}
                             <button onclick="openUploadModal('{{ student.sid }}', false); event.stopPropagation();"
-                                class="bg-yellow-500 text-white py-1 px-3 rounded-lg hover:bg-yellow-600 transition duration-200">Upload Photo</button>
+                                class="bg-yellow-500 text-white py-1 px-3 rounded-lg hover:bg-yellow-600 transition duration-200">Upload
+                                Photo</button>
                             {% else %}
                             <button onclick="openUploadModal('{{ student.sid }}', true); event.stopPropagation();"
-                                class="bg-orange-500 text-white py-1 px-3 rounded-lg hover:bg-orange-600 transition duration-200">Replace Photo</button>
+                                class="bg-orange-500 text-white py-1 px-3 rounded-lg hover:bg-orange-600 transition duration-200">Replace
+                                Photo</button>
                             <button onclick="unmatchStudent('{{ student.sid }}'); event.stopPropagation();"
                                 class="bg-red-500 text-white py-1 px-3 rounded-lg hover:bg-red-600 transition duration-200">Unmatch</button>
                             {% endif %}
@@ -127,8 +137,7 @@
             {% for face in unpaired_faces %}
             <div id="face-card-{{ face.label }}"
                 class="bg-white text-black rounded-lg shadow-md p-4 w-52 text-center hover:shadow-lg transition cursor-pointer">
-                <img src="/{{ face.filepath }}" class="w-24 h-24 mx-auto object-cover mb-2"
-                    alt="Detected face">
+                <img src="/{{ face.filepath }}" class="w-24 h-24 mx-auto object-cover mb-2" alt="Detected face">
                 <button onclick="pairFace('{{ face.label }}', '{{ selectedStudent }}')"
                     class="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition duration-200">
                     Pair
@@ -249,7 +258,7 @@
             }
         }
 
-        document.getElementById('upload-form').addEventListener('submit', function(e) {
+        document.getElementById('upload-form').addEventListener('submit', function (e) {
             e.preventDefault();
             const formData = new FormData(this);
             fetch("{{ url_for('upload_photo') }}", {
@@ -329,7 +338,7 @@
                 .catch(error => {
                     console.error('Error during manual capture:', error);
                     alert('An error occurred during manual capture. Please try again.');
-                    });
+                });
         }
 
         function captureFace() {
@@ -383,16 +392,39 @@
                 });
         }
 
+        let attendanceIntervalId = null; // 全域變數儲存 interval ID
+
         function startAttendance() {
             if (recognitionMode === 'face' || recognitionMode === 'emotion') {
                 alert('This function is disabled in Face Recognition Only or Emotion Recognition Only mode.');
                 return;
             }
-            const interval = document.getElementById('interval').value;
+
+            const interval = parseInt(document.getElementById('interval').value);
+            if (isNaN(interval) || interval <= 0) {
+                alert('Please enter a valid interval (number > 0)');
+                return;
+            }
+
+            // 清除之前的排程（避免重複）
+            if (attendanceIntervalId) {
+                clearInterval(attendanceIntervalId);
+            }
+
+            // 馬上點一次名
+            triggerAttendance();
+
+            // 每 interval 分鐘自動點名
+            attendanceIntervalId = setInterval(triggerAttendance, interval * 60 * 1000);
+
+            alert(`Auto-attendance started. Every ${interval} minutes.`);
+        }
+
+        function triggerAttendance() {
             fetch("{{ url_for('start_attendance') }}", {
                 method: "POST",
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({ interval: interval })
+                body: new URLSearchParams({})
             })
                 .then(response => response.json())
                 .then(data => {
@@ -403,24 +435,18 @@
                             return `${studentName} (${sid})`;
                         }).join(', ');
 
-                        alert(`Attendance recorded!\nInterval: ${data.interval} minutes\nStudents present: ${data.recognized_count}\nRecognized: ${studentList}`);
-                        document.querySelectorAll('#student-list li').forEach(li => {
-                            const sid = li.dataset.sid;
-                            if (data.recognized_students.includes(sid)) {
-                                li.classList.add('bg-green-600');
-                            } else {
-                                li.classList.remove('bg-green-600');
-                            }
-                        });
+                        console.log(`[Auto Attendance] ${data.recognized_count} students present: ${studentList}`);
                     } else {
-                        alert('Failed to start attendance: ' + (data.error || 'Unknown error'));
+                        console.warn('[Auto Attendance] Failed:', data.error || 'Unknown error');
                     }
                 })
                 .catch(error => {
-                    console.error('Error during attendance:', error);
-                    alert('An error occurred while starting attendance. Please try again.');
+                    console.error('Error during auto attendance:', error);
                 });
         }
+
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'92e90bc8283312d2',t:'MTc0NDM1OTQzMC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+    <script>(function () { function c() { var b = a.contentDocument || a.contentWindow.document; if (b) { var d = b.createElement('script'); d.innerHTML = "window.__CF$cv$params={r:'92e90bc8283312d2',t:'MTc0NDM1OTQzMC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);"; b.getElementsByTagName('head')[0].appendChild(d) } } if (document.body) { var a = document.createElement('iframe'); a.height = 1; a.width = 1; a.style.position = 'absolute'; a.style.top = 0; a.style.left = 0; a.style.border = 'none'; a.style.visibility = 'hidden'; document.body.appendChild(a); if ('loading' !== document.readyState) c(); else if (window.addEventListener) document.addEventListener('DOMContentLoaded', c); else { var e = document.onreadystatechange || function () { }; document.onreadystatechange = function (b) { e(b); 'loading' !== document.readyState && (document.onreadystatechange = e, c()) } } } })();</script>
+</body>
+
 </html>
